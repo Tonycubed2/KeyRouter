@@ -1,17 +1,20 @@
-Key Router 1.0.0
-================
+Key Router 1.3.0 (BETA)
+=======================
 
-Targets: Skyrim AE 1.6.1170 (Address Library, version independent; also 1.7.99).
+BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
+mods' config files; every change is written to KeyRouter.log so it can be undone by hand.
+
+Targets: Skyrim SE/AE 1.6.1170 (the only version tested).
 Requires: SKSE, Address Library for SKSE Plugins.
-
-Built against CommonLibSSE-NG 6.7.0 at C:\dllmaker\CommonLibSSE-NG
-(taken from the CommonLibSSEPath_NG environment variable when it is set).
+Optional: SKSE Menu Framework (keyboard map and in-game settings).
+Source: https://github.com/Tonycubed2/keyrouter (built against CommonLibSSE-NG 6.7.0)
 
 What it does
   When you press a key that two or more mods want, the press is held back from all of them and
   a small window lists those mods plus "Nobody". The mod you click gets the press; the others
-  never see it. The window comes back on every press of that key: no choice is remembered and
-  no mod is favored. The way to make it stop is to change the key in one of the named mods.
+  never see it. No mod is favored. Unless you tell it to remember, the window comes back on every
+  press of that key; to make it stop for good, change the key in one of the named mods (the
+  keyboard map below can do that for most DLL mods).
 
   Remember my choice: the window has a "Remember my choice: OFF" button. Click it to switch it ON
   (the window reopens), then pick a mod or Nobody. From then on that key goes straight to your pick
@@ -67,18 +70,10 @@ Limits
     while you click.
   - Gamepad buttons are not checked.
 
-One build folder only: build
-Output: build\Release\KeyRouter.dll and .pdb
-
-Build (Developer Command Prompt for VS 2022), one line at a time:
-  cd /d C:\dllmaker\KeyRouter
-  cmake --preset vs2022-windows
-  cmake --build build --config Release
-
-Install (MO2 mod folder):
-  SKSE\Plugins\KeyRouter.dll
-  SKSE\Plugins\KeyRouter.pdb
-  SKSE\Plugins\KeyRouter.ini
+Install: with your mod manager. Files (all in Data\SKSE\Plugins):
+  KeyRouter.dll, KeyRouter.pdb, KeyRouter.ini (all settings, with explanations),
+  KeyRouter_README.txt (this file), KeyRouter_THIRD-PARTY-SKSEMenuFramework-LICENSE.txt
+Building from source: see README.md at https://github.com/Tonycubed2/keyrouter
 
 Log: Documents\My Games\Skyrim Special Edition\SKSE\KeyRouter.log
 
