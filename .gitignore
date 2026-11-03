@@ -1,0 +1,8 @@
+# build output
+build/
+out/
+.vs/
+CMakeUserPresets.json
+
+# release zips
+*.zip
