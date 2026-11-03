@@ -1,10 +1,11 @@
-Key Router 1.3.0 (BETA)
+Key Router 1.4.0 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
 mods' config files; every change is written to KeyRouter.log so it can be undone by hand.
 
-Targets: Skyrim SE/AE 1.6.1170 (the only version tested).
+Targets: Skyrim AE 1.6.1170 (the only version tested). Should work on other 1.6.x and 1.7.x
+  versions (untested). Not for SE 1.5.x or VR: key routing refuses to install there.
 Requires: SKSE, Address Library for SKSE Plugins.
 Optional: SKSE Menu Framework (keyboard map and in-game settings).
 Source: https://github.com/Tonycubed2/keyrouter
@@ -145,3 +146,15 @@ each one can be changed:
 The change is made in the mod's own file. Updating or reinstalling that mod can bring its old
 key back; move it again then. Every change is written to KeyRouter.log (old and new line).
 Each time the map opens, KeyRouter.log gets one [map] line per used key.
+
+1.4.0
+-----
+- Keyboard map: switchable US (ANSI, 104 keys) or UK (ISO, 105 keys) layout. Use the Layout
+  button on the map, the Keyboard map section of the settings page, or Layout=US / UK in
+  [KeyboardMap]. The UK map has the tall Enter, the # key, the extra \ key next to Left Shift
+  and UK labels (AltGr, #).
+- The extra ISO key (scan code 0x56, between Left Shift and Z) is now known everywhere: it shows on
+  the map, DLL config files that use it are read, and it can be used as a key name ("ISO \").
+- Key routing now installs only on Anniversary Edition (1.6 and newer, including 1.7.x). On SE
+  1.5.x the function Key Router hooks has a different Address Library ID, so it refuses instead of
+  risking a wrong hook (KeyRouter.log says so).

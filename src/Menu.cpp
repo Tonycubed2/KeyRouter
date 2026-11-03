@@ -253,6 +253,18 @@ namespace Menu
 			Help("Hold the key and the keyboard map opens (it can also be opened from the Keyboard map page).");
 			save |= KeyEdit(g_mapKey);
 			save |= Number("Hold seconds##map", Settings::mapHoldSeconds, Settings::kMapMin, Settings::kMapMax);
+			{
+				int layout = Settings::mapLayout;
+				Text("Layout:");
+				SameLine();
+				bool changed = RadioButton("US (ANSI, 104 keys)", &layout, Settings::kLayoutUS);
+				SameLine();
+				changed |= RadioButton("UK (ISO, 105 keys)", &layout, Settings::kLayoutUK);
+				if (changed && layout != Settings::mapLayout) {
+					Settings::mapLayout = layout;
+					save = true;
+				}
+			}
 
 			SeparatorText("Passive mods");
 			Help("These mods still get every key, but never count as a competitor. Only for a mod that just\n"

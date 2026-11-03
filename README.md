@@ -1,6 +1,6 @@
 # Key Router
 
-An SKSE plugin for Skyrim Special Edition / Anniversary Edition **1.6.1170** that finds key conflicts between mods and lets you decide which mod gets the key.
+An SKSE plugin for Skyrim Anniversary Edition (tested on **1.6.1170**) that finds key conflicts between mods and lets you decide which mod gets the key.
 
 > ## ⚠️ Beta: best effort, no guarantees
 > This mod is in **beta**. It hooks Skyrim's input system, which is one of the busiest and most heavily modded parts of the game. It works in the author's own heavily modded setup, but every load order is different and they cannot all be tested.
@@ -31,7 +31,8 @@ Mods often grab the same key without knowing about each other. You press L and t
 - **Remember my choice**: that key then goes straight to your pick, even after reloading. It asks again if a mod that wants the key is added or removed.
 
 ### Keyboard map (needs SKSE Menu Framework)
-- Hold **Backspace for 10 seconds** (you can change the key), or open it from the menu. It shows a full 104-key keyboard plus mouse buttons, and the game pauses while it is open.
+- Hold **Backspace for 10 seconds** (you can change the key), or open it from the menu. It shows the keyboard plus mouse buttons, and the game pauses while it is open.
+- Switchable **US (ANSI, 104 keys)** or **UK (ISO, 105 keys)** layout: the Layout button on the map, the settings page, or `Layout=` in `KeyRouter.ini`. The UK map has the tall Enter, the `#` key, the extra `\` key next to Left Shift, and UK labels.
 - Colors:
   - green: no mod uses the key
   - orange: one mod
@@ -69,7 +70,7 @@ Mods often grab the same key without knowing about each other. You press L and t
 - Optional per-key-press logging (`LogKeys`) and diagnostics help with bug reports.
 
 ## Requirements
-- Skyrim SE/AE **1.6.1170**. This is the only version tested.
+- Skyrim AE **1.6.1170**, the only version tested. It should work on other 1.6.x and 1.7.x versions (untested). Not for SE 1.5.x or VR: key routing refuses to install there.
 - [SKSE64](https://skse.silverlock.org/)
 - [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444)
 - [SKSE Menu Framework](https://www.nexusmods.com/skyrimspecialedition/mods/120352): optional, but needed for the keyboard map and the in-game settings.
@@ -109,7 +110,7 @@ The DLL and PDB are in `build\Release`. Install them with `KeyRouter.ini` into `
 ## License
 - Key Router's own source code: **MIT**, see [LICENSE](LICENSE).
 - `KeyRouter.dll` statically links [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG), which is **GPL-3.0-or-later** with the Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source). So the compiled DLL as a whole is distributed under **GPL-3.0-or-later** with those exceptions. See [GPL-3.0.txt](GPL-3.0.txt) and [CommonLibSSE-NG-EXCEPTIONS.txt](CommonLibSSE-NG-EXCEPTIONS.txt).
-- Corresponding source for each release: this repository at the release tag (for example `v1.3.0`), plus CommonLibSSE NG 6.7.0.
+- Corresponding source for each release: this repository at the release tag (for example `v1.4.0`), plus CommonLibSSE NG 6.7.0.
 - Other libraries in the build (spdlog, {fmt}, DirectXTK, Xbyak, and the SKSE Menu Framework API header) are listed with their licenses in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits

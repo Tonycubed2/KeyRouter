@@ -29,7 +29,7 @@ namespace Keys
 			{ 0x46, "Scroll Lock" }, { 0x47, "Num 7" }, { 0x48, "Num 8" }, { 0x49, "Num 9" },
 			{ 0x4A, "Num -" }, { 0x4B, "Num 4" }, { 0x4C, "Num 5" }, { 0x4D, "Num 6" },
 			{ 0x4E, "Num +" }, { 0x4F, "Num 1" }, { 0x50, "Num 2" }, { 0x51, "Num 3" },
-			{ 0x52, "Num 0" }, { 0x53, "Num ." }, { 0x57, "F11" }, { 0x58, "F12" },
+			{ 0x52, "Num 0" }, { 0x53, "Num ." }, { 0x56, "ISO \\" }, { 0x57, "F11" }, { 0x58, "F12" },
 			{ 0x9C, "Num Enter" }, { 0x9D, "Right Ctrl" }, { 0xB5, "Num /" }, { 0xB7, "Print Screen" },
 			{ 0xB8, "Right Alt" }, { 0xC5, "Pause" }, { 0xC7, "Home" }, { 0xC8, "Up" },
 			{ 0xC9, "Page Up" }, { 0xCB, "Left" }, { 0xCD, "Right" }, { 0xCF, "End" },
@@ -56,7 +56,8 @@ namespace Keys
 			{ 0x53, "Decimal" }, { 0xB5, "Divide" }, { 0x9C, "NumpadEnter" }, { 0xB7, "SysRq" },
 			{ 0xB7, "Snapshot" }, { 0x46, "Scroll" }, { 0xDB, "LWin" }, { 0xDC, "RWin" },
 			{ 0xDD, "Apps" }, { 0xC8, "UpArrow" }, { 0xD0, "DownArrow" }, { 0xCB, "LeftArrow" },
-			{ 0xCD, "RightArrow" }, { 256, "LMB" }, { 257, "RMB" }, { 258, "MMB" }
+			{ 0xCD, "RightArrow" }, { 256, "LMB" }, { 257, "RMB" }, { 258, "MMB" },
+			{ 0x56, "OEM_102" }, { 0x56, "IntlBackslash" }, { 0x56, "ISO Backslash" }
 		};
 
 		std::unordered_map<std::string, std::uint32_t> g_byName;

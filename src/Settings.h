@@ -27,6 +27,9 @@ namespace Settings
 	inline std::atomic<bool>          mapEnabled{ true };
 	inline std::string                mapKey = "Backspace";          // only touched at load and by the menu
 	inline std::atomic<std::uint32_t> mapHoldSeconds{ 10 };
+	inline std::atomic<int>           mapLayout{ 0 };  // kLayoutUS or kLayoutUK
+	constexpr int                     kLayoutUS = 0;   // US ANSI 104 keys
+	constexpr int                     kLayoutUK = 1;   // UK ISO 105 keys
 
 	// [PassiveMods]: passiveMods = lowercase names used for matching, passiveNames = as written.
 	// Same order and size. Hold listLock to read or change them.

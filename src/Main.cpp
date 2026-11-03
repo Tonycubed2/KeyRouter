@@ -1,4 +1,4 @@
-// Key Router 1.3.0
+// Key Router 1.4.0
 // Built against CommonLibSSE-NG 6.7.0 for Skyrim AE 1.6.1170 (and 1.7.99).
 //
 // Finds key presses that more than one mod wants (Papyrus scripts, SKSE DLL mods, and the
@@ -20,7 +20,7 @@
 #include "Viewer.h"
 
 SKSEPluginInfo(
-	.Version = REL::Version{ 1, 3, 0, 0 },
+	.Version = REL::Version{ 1, 4, 0, 0 },
 	.Name = "KeyRouter"sv,
 	.Author = "tonycubed2"sv,
 	.StructCompatibility = SKSE::StructCompatibility::Independent,
@@ -73,7 +73,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 
-	logger::info("Key Router 1.3.0 loading; game runtime {}", REL::Module::get().version().string());
+	logger::info("Key Router 1.4.0 loading; game runtime {}", REL::Module::get().version().string());
 
 	Settings::Load();
 	Keys::Init();
@@ -83,11 +83,12 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 	KillSwitch::Start();
 
 	if (Settings::enabled) {
-		Router::InstallHooks();
-		Diag::Start();
-		Diag::InstallWindowWatch();
-		Poll::InstallDirectInput();
-		g_routing = true;
+		g_routing = Router::InstallHooks();
+		if (g_routing) {
+			Diag::Start();
+			Diag::InstallWindowWatch();
+			Poll::InstallDirectInput();
+		}
 	} else {
 		logger::info("Key routing is off in KeyRouter.ini (the settings page and keyboard map still work)");
 	}

@@ -7,7 +7,9 @@
 // choice).
 namespace Router
 {
-	void InstallHooks();   // plugin load: input dispatch hook + Papyrus event hook
+	// Plugin load: input dispatch hook + Papyrus event hook. False when key routing could not be
+	// installed (not Anniversary Edition 1.6+, or the input function is not as expected).
+	bool InstallHooks();
 	void OnDataLoaded();
 	void Reset();          // new game / save loaded
 	void OnPopupAnswer(std::uint32_t a_popupId, std::uint8_t a_button);

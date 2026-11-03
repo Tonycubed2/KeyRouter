@@ -1798,8 +1798,19 @@ namespace Router
 		return out;
 	}
 
-	void InstallHooks()
+	bool InstallHooks()
 	{
+		// The input send function is found by its Anniversary Edition Address Library ID (68655).
+		// SE 1.5.x numbers its functions differently: that ID is some other function there, and its
+		// first bytes could match by chance. Checked: the ID exists, next to PollInputDevices, in the
+		// Address Library of every 1.6.x and 1.7.x version. Only 1.6.1170 is tested in game.
+		if (!REL::Module::IsAE()) {
+			logger::critical("Key routing needs Skyrim 1.6 (Anniversary Edition) or newer; this game is {}. "
+							 "Key routing NOT installed.",
+				REL::Module::get().version().string());
+			return false;
+		}
+
 		SKSE::AllocTrampoline(128);
 
 		// The frame's input events are sent by the game's input-send function (ID 68655, RVA
@@ -1825,6 +1836,7 @@ namespace Router
 			logger::critical("Input send function does not start as expected ({:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X} {:02X}); "
 							 "another mod may have hooked it. Key routing NOT installed.",
 				b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+			return false;
 		} else {
 			// Trampoline: the 8 original bytes, then an absolute jump back to entry + 8
 			auto* stub = static_cast<std::uint8_t*>(SKSE::GetTrampoline().allocate(8 + 14));
@@ -1845,6 +1857,7 @@ namespace Router
 		g_originalSendEvent = reinterpret_cast<SendEventFn>(vmVtbl.write_vfunc(0x24, Hook_SendEvent));
 
 		logger::info("Input and Papyrus event hooks installed");
+		return true;
 	}
 
 	bool HooksInstalled()

@@ -23,7 +23,7 @@ namespace Viewer
 		};
 
 		// 104-key US (ANSI) layout plus a mouse panel; codes are DirectX scan codes, mouse 256+
-		const std::vector<KeyRect>& Layout()
+		const std::vector<KeyRect>& LayoutUS()
 		{
 			static std::vector<KeyRect> keys = [] {
 				std::vector<KeyRect> k;
@@ -85,6 +85,53 @@ namespace Viewer
 				return k;
 			}();
 			return keys;
+		}
+
+		// UK ISO 105 keys: the US layout with a tall Enter, # next to it, a short Left Shift with the
+		// extra ISO key (scan code 0x56) beside it, and UK labels
+		const std::vector<KeyRect>& LayoutUK()
+		{
+			static std::vector<KeyRect> keys = [] {
+				auto k = LayoutUS();
+				std::erase_if(k, [](const KeyRect& r) { return r.code == 0x2B || r.code == 0x1C || r.code == 0x2A; });
+				k.push_back({ 0x1C, 13.75F, 2.5F, 1.25F, 2.0F, "Enter" });
+				k.push_back({ 0x2B, 12.75F, 3.5F, 1.0F, 1.0F, "#" });
+				k.push_back({ 0x2A, 0.0F, 4.5F, 1.25F, 1.0F, "Shift" });
+				k.push_back({ 0x56, 1.25F, 4.5F, 1.0F, 1.0F, "\\" });
+				for (auto& r : k) {
+					if (r.code == 0xB8) {
+						r.label = "AltGr";
+					}
+				}
+				return k;
+			}();
+			return keys;
+		}
+
+		bool UK() { return Settings::mapLayout == Settings::kLayoutUK; }
+
+		const std::vector<KeyRect>& Layout() { return UK() ? LayoutUK() : LayoutUS(); }
+
+		// Key name as printed on the player's keyboard
+		std::string DisplayName(std::uint32_t a_code)
+		{
+			if (UK()) {
+				switch (a_code) {
+				case 0x2B:
+					return "#";
+				case 0x56:
+					return "\\ (ISO key next to Left Shift)";
+				case 0xB8:
+					return "AltGr";
+				case 0x28:
+					return "' (@ with Shift)";
+				case 0x29:
+					return "`";
+				default:
+					break;
+				}
+			}
+			return Keys::Name(a_code);
 		}
 
 		MENU_WINDOW                g_window = nullptr;
@@ -443,7 +490,7 @@ namespace Viewer
 					}
 				}
 			} else if (g_move.step == MoveStep::kConfirm) {
-				const auto name = Keys::Name(g_move.to);
+				const auto name = DisplayName(g_move.to);
 				TextColored(warn, "%s is also used by: %s", name.c_str(), UsersOf(g_move.to).c_str());
 				if (SmallButton(std::format("Use {} anyway##move", name).c_str())) {
 					DoMove();
@@ -472,7 +519,7 @@ namespace Viewer
 			const auto it = g_map.find(g_selected);
 			TextColored(gold, "SELECTED KEY:");
 			SameLine();
-			Text("%s", Keys::Name(g_selected).c_str());
+			Text("%s", DisplayName(g_selected).c_str());
 			if (it == g_map.end() || (it->second.plain.empty() && it->second.combos.empty())) {
 				TextDisabled("No mod uses this key.");
 				EndChild();
@@ -534,7 +581,7 @@ namespace Viewer
 					line += std::format("{}{}: {} [{}]{}", line.empty() ? "" : " | ", b.combo, b.name, b.source, b.moved ? " moved here" : "");
 				}
 				const auto status = ColorOf(entry);
-				logger::info("[map] {} ({}): {}", Keys::Name(code),
+				logger::info("[map] {} ({}): {}", DisplayName(code),
 					status == Color::kConflict ? "CONFLICT" : status == Color::kSafe ? "shared" : status == Color::kOne ? "one mod" : "combos only", line);
 			}
 		}
@@ -649,7 +696,7 @@ namespace Viewer
 			if (hoverKey) {
 				const auto  it = g_map.find(hoverKey->code);
 				const auto& entry = it == g_map.end() ? empty : it->second;
-				std::string tip = Keys::Name(hoverKey->code);
+				std::string tip = DisplayName(hoverKey->code);
 				if (entry.plain.empty() && entry.combos.empty()) {
 					tip += "\nNo mod uses this key.";
 				}
@@ -687,6 +734,11 @@ namespace Viewer
 			SetCursorScreenPos(ImVec2{ sb.x - 250 - 120, sa.y + 8 + font * 1.6F });
 			if (Button("Close##map")) {
 				g_window->IsOpen = false;
+			}
+			SetCursorScreenPos(ImVec2{ sb.x - 250 - 120, sa.y + 8 + font * 3.2F });
+			if (Button(UK() ? "Layout: UK##map" : "Layout: US##map")) {
+				Settings::mapLayout = UK() ? Settings::kLayoutUS : Settings::kLayoutUK;
+				Settings::Save();
 			}
 			End();
 		}

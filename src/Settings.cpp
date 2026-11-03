@@ -117,6 +117,7 @@ namespace Settings
 				{ "keyboardmap", "Enabled", b(mapEnabled) },
 				{ "keyboardmap", "Key", mapKey },
 				{ "keyboardmap", "HoldSeconds", std::to_string(mapHoldSeconds.load()) },
+				{ "keyboardmap", "Layout", mapLayout == kLayoutUK ? "UK" : "US" },
 			};
 		}
 
@@ -191,6 +192,15 @@ namespace Settings
 					}
 				} else if (e.key == "holdseconds") {
 					ReadNumber(e, mapHoldSeconds, kMapMin, kMapMax);
+				} else if (e.key == "layout") {
+					const auto v = Lower(e.value);
+					if (v == "us" || v == "ansi") {
+						mapLayout = kLayoutUS;
+					} else if (v == "uk" || v == "iso") {
+						mapLayout = kLayoutUK;
+					} else {
+						logger::warn("Bad value for [KeyboardMap] Layout: '{}' (US or UK), keeping {}", e.value, mapLayout == kLayoutUK ? "UK" : "US");
+					}
 				}
 			} else if (e.section == "passivemods") {
 				if (ToBool(e, false)) {
@@ -209,7 +219,8 @@ namespace Settings
 		logger::info("Settings: ScanDllConfigs={} PollHooks={} DirectInputHooks={} SyntheticPressMs={} LogKeys={} Diagnostics={}",
 			scanDllConfigs.load(), pollHooks.load(), directInputHooks.load(), syntheticPressMs.load(), logKeys.load(), diagnostics.load());
 		logger::info("Settings: KillSwitch Enabled={} Key={} HoldSeconds={}", killSwitchEnabled.load(), killSwitchKey, killSwitchHoldSeconds.load());
-		logger::info("Settings: KeyboardMap Enabled={} Key={} HoldSeconds={}", mapEnabled.load(), mapKey, mapHoldSeconds.load());
+		logger::info("Settings: KeyboardMap Enabled={} Key={} HoldSeconds={} Layout={}", mapEnabled.load(), mapKey, mapHoldSeconds.load(),
+			mapLayout == kLayoutUK ? "UK" : "US");
 		{
 			std::scoped_lock lock(listLock);
 			for (const auto& name : passiveMods) {
