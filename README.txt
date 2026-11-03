@@ -7,7 +7,9 @@ mods' config files; every change is written to KeyRouter.log so it can be undone
 Targets: Skyrim SE/AE 1.6.1170 (the only version tested).
 Requires: SKSE, Address Library for SKSE Plugins.
 Optional: SKSE Menu Framework (keyboard map and in-game settings).
-Source: https://github.com/Tonycubed2/keyrouter (built against CommonLibSSE-NG 6.7.0)
+Source: https://github.com/Tonycubed2/keyrouter
+License: Key Router's code is MIT. The DLL links CommonLibSSE NG (GPL-3.0-or-later with
+  exceptions), so the DLL as a whole is GPL-3.0-or-later; see KeyRouter_THIRD-PARTY-NOTICES.txt.
 
 What it does
   When you press a key that two or more mods want, the press is held back from all of them and
@@ -72,7 +74,8 @@ Limits
 
 Install: with your mod manager. Files (all in Data\SKSE\Plugins):
   KeyRouter.dll, KeyRouter.pdb, KeyRouter.ini (all settings, with explanations),
-  KeyRouter_README.txt (this file), KeyRouter_THIRD-PARTY-SKSEMenuFramework-LICENSE.txt
+  KeyRouter_README.txt (this file), and the license files: KeyRouter_THIRD-PARTY-NOTICES.txt,
+  KeyRouter_GPL-3.0.txt, KeyRouter_CommonLibSSE-NG-EXCEPTIONS.txt
 Building from source: see README.md at https://github.com/Tonycubed2/keyrouter
 
 Log: Documents\My Games\Skyrim Special Edition\SKSE\KeyRouter.log

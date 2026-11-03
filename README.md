@@ -84,7 +84,7 @@ Mods often grab the same key without knowing about each other. You press L and t
 
 ## Building
 
-Built with Visual Studio 2022, CMake and vcpkg against [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) 6.7.0.
+Built with Visual Studio 2022, CMake and vcpkg against [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG) 6.7.0.
 
 1. Get the CommonLibSSE-NG source and set the environment variable `CommonLibSSEPath_NG` to its folder (or put it at `C:\dllmaker\CommonLibSSE-NG`).
 2. Set `VCPKG_ROOT` (Visual Studio's bundled vcpkg works).
@@ -107,7 +107,10 @@ The DLL and PDB are in `build\Release`. Install them with `KeyRouter.ini` into `
 - `src/SKSEMenuFramework.h`: the SKSE Menu Framework API header by Thiago Kaique (QTR-Modding), MIT; see `THIRD-PARTY-SKSEMenuFramework-LICENSE.txt`
 
 ## License
-MIT. See [LICENSE](LICENSE).
+- Key Router's own source code: **MIT**, see [LICENSE](LICENSE).
+- `KeyRouter.dll` statically links [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG), which is **GPL-3.0-or-later** with the Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source). So the compiled DLL as a whole is distributed under **GPL-3.0-or-later** with those exceptions. See [GPL-3.0.txt](GPL-3.0.txt) and [CommonLibSSE-NG-EXCEPTIONS.txt](CommonLibSSE-NG-EXCEPTIONS.txt).
+- Corresponding source for each release: this repository at the release tag (for example `v1.3.0`), plus CommonLibSSE NG 6.7.0.
+- Other libraries in the build (spdlog, {fmt}, DirectXTK, Xbyak, and the SKSE Menu Framework API header) are listed with their licenses in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits
 - The SKSE team, the Address Library and CommonLibSSE-NG authors
