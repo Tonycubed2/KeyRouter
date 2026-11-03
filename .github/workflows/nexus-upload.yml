@@ -1,10 +1,11 @@
 name: Upload to Nexus Mods
 
 # Manual release: Actions tab -> "Upload to Nexus Mods" -> Run workflow.
-# Nothing is built here. The zip is the one Tony built on his PC and attached to the GitHub
-# release for the tag below (KeyRouter-<version>.zip). This workflow downloads that asset, checks
-# it holds the DLL and the INI, and uploads it to Nexus as a new version of the main file, with
-# the changelog.
+# Nothing is built here. The zip is the one Tony built on his PC, committed as
+# dist/KeyRouter-<version>.zip. This workflow:
+#   1. checks the zip holds the DLL, the INI and the GPL text,
+#   2. creates the GitHub release v<version> (pre-release) with the zip attached, unless it exists,
+#   3. uploads the zip to Nexus as a new version of the main file, with the changelog.
 #
 # Needs, in the "nexus" environment (Settings -> Environments -> nexus):
 #   secret   NEXUSMODS_API_KEY  - personal API key from nexusmods.com/settings/api-keys
@@ -14,23 +15,25 @@ name: Upload to Nexus Mods
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "GitHub release tag whose zip to upload (e.g. v1.4.0)"
-        required: true
       version:
-        description: "Version shown on Nexus (e.g. 1.4.0)"
+        description: "Version (e.g. 1.4.0): uploads dist/KeyRouter-<version>.zip, release tag v<version>"
         required: true
       changelog:
-        description: "Changelog text (optional, plain text; use ' | ' to separate lines)"
+        description: "Changelog text (plain text; use ' | ' to separate lines)"
         required: false
         default: ""
       display_name:
         description: "File name shown on Nexus"
         required: false
         default: "Key Router"
+      prerelease:
+        description: "Mark the GitHub release as a pre-release (beta)"
+        type: boolean
+        required: false
+        default: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   upload:
@@ -40,33 +43,28 @@ jobs:
       - name: Check settings
         env:
           HAS_KEY: ${{ secrets.NEXUSMODS_API_KEY != '' }}
-          FILE_ID: ${{ vars.NEXUSMODS_FILE_ID || '8301024' }}
-          MOD_ID: ${{ vars.NEXUSMODS_MOD_ID || '7318624470225' }}
         run: |
           if [ "$HAS_KEY" != "true" ]; then echo "::error::Secret NEXUSMODS_API_KEY is missing in the nexus environment"; exit 1; fi
-          if [ -z "$FILE_ID" ]; then echo "::error::Variable NEXUSMODS_FILE_ID is missing in the nexus environment"; exit 1; fi
-          if [ -z "$MOD_ID" ]; then echo "::error::Variable NEXUSMODS_MOD_ID is missing in the nexus environment"; exit 1; fi
 
-      - name: Download the zip from the GitHub release
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Make sure the zip is there and complete
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
         run: |
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'KeyRouter-*.zip' --dir dl
-          count=$(ls dl/*.zip | wc -l)
-          if [ "$count" != "1" ]; then echo "::error::Release $TAG must have exactly one KeyRouter-*.zip asset (found $count)"; exit 1; fi
-          mv dl/*.zip KeyRouter.zip
-
-      - name: Make sure the zip is complete
-        run: |
-          unzip -l KeyRouter.zip
+          zip="dist/KeyRouter-$VERSION.zip"
+          if [ ! -f "$zip" ]; then echo "::error::$zip is not in the repository"; exit 1; fi
+          unzip -l "$zip"
           for f in SKSE/Plugins/KeyRouter.dll SKSE/Plugins/KeyRouter.ini SKSE/Plugins/KeyRouter_GPL-3.0.txt; do
-            if ! unzip -l KeyRouter.zip "$f" > /dev/null; then echo "::error::MISSING $f in the zip - not uploading"; exit 1; fi
+            if ! unzip -l "$zip" "$f" > /dev/null; then echo "::error::MISSING $f in $zip - not uploading"; exit 1; fi
           done
+          cp "$zip" KeyRouter.zip
 
       - name: Format changelog
         id: log
-        if: ${{ inputs.changelog != '' }}
         env:
           TEXT: ${{ inputs.changelog }}
         run: |
@@ -75,6 +73,23 @@ jobs:
             printf '%s\n' "$TEXT" | sed 's/ | /\n/g'
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub release (source tag for the GPL notice)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          NOTES: ${{ steps.log.outputs.text }}
+          PRE: ${{ inputs.prerelease }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Release $tag already exists, leaving it as it is"
+          else
+            flag=""
+            if [ "$PRE" = "true" ]; then flag="--prerelease"; fi
+            printf '%s\n' "${NOTES:-Key Router $VERSION}" > notes.txt
+            gh release create "$tag" "dist/KeyRouter-$VERSION.zip" --target "$GITHUB_SHA" --title "Key Router $VERSION" --notes-file notes.txt $flag
+          fi
 
       - name: Upload to Nexus Mods
         uses: Nexus-Mods/upload-action@main

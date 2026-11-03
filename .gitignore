@@ -6,3 +6,6 @@ CMakeUserPresets.json
 
 # release zips
 *.zip
+
+# release zips built on Tony's PC, uploaded by the Nexus workflow
+!dist/KeyRouter-*.zip
