@@ -8,8 +8,8 @@ name: Upload to Nexus Mods
 #
 # Needs, in the "nexus" environment (Settings -> Environments -> nexus):
 #   secret   NEXUSMODS_API_KEY  - personal API key from nexusmods.com/settings/api-keys
-#   variable NEXUSMODS_FILE_ID  - "File ID" of the main file (Files tab -> Advanced -> API)
-#   variable NEXUSMODS_MOD_ID   - "Unique Mod ID" (same dialog)
+#   variable NEXUSMODS_FILE_ID  - optional; "File ID" of the main file (Files tab -> Advanced -> API), default 8301024
+#   variable NEXUSMODS_MOD_ID   - optional; "Unique Mod ID" (same dialog), default 7318624470225
 
 on:
   workflow_dispatch:
@@ -40,8 +40,8 @@ jobs:
       - name: Check settings
         env:
           HAS_KEY: ${{ secrets.NEXUSMODS_API_KEY != '' }}
-          FILE_ID: ${{ vars.NEXUSMODS_FILE_ID }}
-          MOD_ID: ${{ vars.NEXUSMODS_MOD_ID }}
+          FILE_ID: ${{ vars.NEXUSMODS_FILE_ID || '8301024' }}
+          MOD_ID: ${{ vars.NEXUSMODS_MOD_ID || '7318624470225' }}
         run: |
           if [ "$HAS_KEY" != "true" ]; then echo "::error::Secret NEXUSMODS_API_KEY is missing in the nexus environment"; exit 1; fi
           if [ -z "$FILE_ID" ]; then echo "::error::Variable NEXUSMODS_FILE_ID is missing in the nexus environment"; exit 1; fi
@@ -80,10 +80,10 @@ jobs:
         uses: Nexus-Mods/upload-action@main
         with:
           api_key: ${{ secrets.NEXUSMODS_API_KEY }}
-          file_id: ${{ vars.NEXUSMODS_FILE_ID }}
+          file_id: ${{ vars.NEXUSMODS_FILE_ID || '8301024' }}
           filename: KeyRouter.zip
           display_name: ${{ inputs.display_name }}
           version: ${{ inputs.version }}
-          mod_id: ${{ vars.NEXUSMODS_MOD_ID }}
+          mod_id: ${{ vars.NEXUSMODS_MOD_ID || '7318624470225' }}
           changelog: ${{ steps.log.outputs.text }}
           update_mod_version: true
