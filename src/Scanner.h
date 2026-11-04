@@ -1,7 +1,8 @@
 #pragma once
 
 // Learns which keys SKSE DLL mods want, by reading their config files
-// (Data\SKSE\Plugins\<Name>.ini/.toml/.json, a <Name> folder there, and MCM Helper settings),
+// (Data\SKSE\Plugins\<Name>.ini/.toml/.json, a <Name> folder there, Data\Interface\<Name>\,
+// and MCM Helper settings),
 // plus the player's corrections in KeyRouter.ini [DllKeys].
 namespace Scanner
 {

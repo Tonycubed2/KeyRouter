@@ -52,7 +52,8 @@ namespace Scanner
 			if (std::any_of(words.begin(), words.end(), [&](std::string_view w) { return file.find(w) != std::string::npos; })) {
 				return true;
 			}
-			constexpr std::array dirs{ "languages"sv, "language"sv, "lang"sv, "translations"sv, "translation"sv,
+			// themes: color tables ("KEYM": [255, 153, 76, 255] in Modex) are not hotkeys either
+			constexpr std::array dirs{ "themes"sv, "theme"sv, "languages"sv, "language"sv, "lang"sv, "translations"sv, "translation"sv,
 				"locales"sv, "locale"sv, "strings"sv, "i18n"sv, "l10n"sv };
 			for (auto parent = a_path.parent_path(); !parent.empty() && parent != parent.parent_path(); parent = parent.parent_path()) {
 				const auto name = Owners::Lower(parent.filename().string());
@@ -247,6 +248,18 @@ namespace Scanner
 					continue;
 				}
 				const auto lowerName = Owners::Lower(kv->name);
+				// "Open Menu Modifier": 42 (Modex) - the Shift/Ctrl/Alt held with this file's hotkeys.
+				// 0 means none and is skipped by ParseCombo.
+				if (lowerName.find("modifier") != std::string::npos && lowerName.find("enable") == std::string::npos &&
+					lowerName.find("disable") == std::string::npos) {
+					if (auto m = ParseCombo(kv->value, lowerName.find("vk") != std::string::npos, "+,|"sv);
+						m && m->modGroups.empty() && Keys::ModifierBit(m->code) != 0) {
+						m->from = std::format("{}: {}", label, kv->name);
+						m->origin.reset();
+						modifiers.push_back(std::move(*m));
+					}
+					continue;
+				}
 				if (!LooksLikeHotkeySetting(lowerName)) {
 					continue;
 				}
@@ -328,6 +341,26 @@ namespace Scanner
 				} catch (const std::exception& e) {
 					logger::warn("Skipped a file while scanning {}: {}", a_module.fileName, e.what());
 				}
+			}
+
+			// Data\Interface\<name>: some DLL mods keep their settings next to their UI files
+			// (Modex: Data\Interface\Modex\user\settings.json, "Open Menu Keybind": 211)
+			try {
+				std::error_code ec;
+				const fs::path  ui = fs::path("Data/Interface") / a_module.stem;
+				if (fs::is_directory(ui, ec)) {
+					for (auto it = fs::recursive_directory_iterator(ui, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+						if (it.depth() > 2) {
+							it.disable_recursion_pending();
+							continue;
+						}
+						if (it->is_regular_file(ec) && IsConfigFile(it->path())) {
+							ScanFile(it->path(), a_dll, nullptr, false);
+						}
+					}
+				}
+			} catch (const std::exception& e) {
+				logger::warn("Skipped Data/Interface files for {}: {}", a_module.fileName, e.what());
 			}
 
 			// MCM Helper: the player's settings win over the mod's defaults
