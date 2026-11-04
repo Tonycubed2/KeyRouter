@@ -1,4 +1,4 @@
-Key Router 1.4.0 (BETA)
+Key Router 1.5.0 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -158,3 +158,15 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
 - Key routing now installs only on Anniversary Edition (1.6 and newer, including 1.7.x). On SE
   1.5.x the function Key Router hooks has a different Address Library ID, so it refuses instead of
   risking a wrong hook (KeyRouter.log says so).
+
+1.5.0
+-----
+- Hotkeys kept in Data\Interface\<dll name>\ are now found. Modex keeps its menu key there
+  (Interface\Modex\user\settings.json, "Open Menu Keybind", default Delete), so Delete was
+  missed before. Settings named "...Modifier" are read as the Shift/Ctrl/Alt held with that
+  mod's keys. Theme folders are skipped (their color lists are not keys). Move works there too.
+- Early input hook: some mods (Modex among them) read every key in the game's input poll,
+  before the function Key Router hooks, so Key Router could not hold a key back from them.
+  Key Router now also hooks that call (PollInputDevices +0x7B), after every plugin has loaded,
+  so it runs in front of them: a key in conflict is kept from them until you pick, and they get
+  it when you pick them. The mods found reading input there are listed in KeyRouter.log.

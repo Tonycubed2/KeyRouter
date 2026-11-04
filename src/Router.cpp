@@ -10,6 +10,8 @@
 #include "Scanner.h"
 #include "Settings.h"
 
+#include <Windows.h>
+
 // How a key press travels:
 //   The game polls the keyboard and sends one chain of InputEvents per frame through
 //   BSInputDeviceManager (a BSTEventSource), on whichever game thread runs the input job. Every
@@ -1228,40 +1230,39 @@ namespace Router
 			}
 		}
 
-		void Hook_Input(Source* a_source, RE::InputEvent* const* a_events)
+		// ---- one input frame, split in two so the early hook (below) can decide before the
+		// mods that read input ahead of the send function, and the send hook can send after them
+
+		struct Frame
 		{
-			// The send function is only called from the input poll, but only BSInputDeviceManager's own
-			// frames are Key Router's business
-			if (a_source != static_cast<Source*>(RE::BSInputDeviceManager::GetSingleton())) {
-				g_originalInput(a_source, a_events);
-				return;
-			}
-			Diag::CountHookCall(!a_events || !*a_events);
-			Diag::HookEnter();
-			struct LeaveGuard
-			{
-				~LeaveGuard() { Diag::HookLeave(); }
-			} leaveGuard;
-			Diag::HookStep("waiting for Key Router lock", "");
-			std::unique_lock lock(g_lock);
-			Diag::HookStep("got Key Router lock", "");
+			Source*                      source{ nullptr };
+			RE::InputEvent* const*       original{ nullptr };
+			RE::InputEvent*              head{ nullptr };
+			bool                         injectedDown{ false };
+			bool                         injectedUp{ false };
+			std::vector<RE::InputEvent*> nodes;
+			std::size_t                  firstReal{ 0 };
+		};
+
+		// g_lock held. Delivery injection, Papyrus capture and the decisions for new presses.
+		// False: not a frame Key Router works on; send it untouched.
+		bool PrepareFrame(Source* a_source, RE::InputEvent* const* a_events, Frame& a_frame)
+		{
 			if (g_inDispatch || !a_source || !a_events) {
-				lock.unlock();
-				g_originalInput(a_source, a_events);
-				return;
+				return false;
 			}
+			a_frame.source = a_source;
+			a_frame.original = a_events;
 
 			// A picked press (or its release) waiting for a frame rides along in this one
 			RE::InputEvent* head = *a_events;
-			bool            injectedDown = false;
-			bool            injectedUp = false;
 			if (g_delivery && (g_delivery->phase == Phase::kSendDown || g_delivery->phase == Phase::kSendUp)) {
 				const bool down = g_delivery->phase == Phase::kSendDown;
 				if (auto* ev = Synthetic(g_delivery->code, down, g_delivery->userEvent)) {
 					ev->next = head;
 					head = ev;
-					injectedDown = down;
-					injectedUp = !down;
+					a_frame.injectedDown = down;
+					a_frame.injectedUp = !down;
 					if (down) {
 						StartRouting(*g_delivery, true);
 					}
@@ -1269,21 +1270,20 @@ namespace Router
 					logger::info("[diag] replay goes to {}", g_delivery->who.display);
 				}
 			}
-
 			if (!head) {
-				lock.unlock();
-				g_originalInput(a_source, a_events);
-				return;
+				return false;
 			}
+			a_frame.head = head;
 			g_inDispatch = true;
-			RE::InputEvent* const* events = &head;
+			RE::InputEvent* const* events = &a_frame.head;
 
-			std::vector<RE::InputEvent*>      nodes;
+			auto&                             nodes = a_frame.nodes;
 			std::unordered_set<std::uint32_t> inFrame;
 			for (auto* e = head; e && nodes.size() < kMaxChain; e = e->next) {
 				nodes.push_back(e);
 			}
-			const std::size_t firstReal = (injectedDown || injectedUp) ? 1 : 0;
+			a_frame.firstReal = (a_frame.injectedDown || a_frame.injectedUp) ? 1 : 0;
+			const std::size_t firstReal = a_frame.firstReal;
 
 			g_frameBusy = g_popup.has_value() || (g_delivery && g_delivery->phase == Phase::kWaitClose);
 
@@ -1350,37 +1350,48 @@ namespace Router
 				}
 				OpenConflict(*code, button, std::move(candidates), gameplay);
 			}
+			return true;
+		}
+
+		// g_lock held on entry and on return (unlocked while the game sends the frame).
+		// a_send false: the frame never reached the send function (a mod in front of it dropped
+		// it); only the bookkeeping is done.
+		void SendFrame(Frame& a_frame, std::unique_lock<std::recursive_mutex>& a_lock, bool a_send)
+		{
+			Source*           source = a_frame.source;
+			auto&             nodes = a_frame.nodes;
+			const std::size_t firstReal = a_frame.firstReal;
 
 			// 3. Send the frame, each listener behind a filtering proxy
 			g_papReleased = false;
 			g_removedSinks.clear();
-			g_traceFrame = injectedDown || injectedUp;
+			g_traceFrame = a_frame.injectedDown || a_frame.injectedUp;
 			g_traceCode = g_delivery ? g_delivery->code : 0;
-			{
-				RE::BSSpinLockGuard sinkLock(a_source->lock);
-				for (auto& sink : a_source->sinks) {
-					if (!sink || g_proxies.contains(sink)) {
-						continue;
+			if (a_send) {
+				{
+					RE::BSSpinLockGuard sinkLock(source->lock);
+					for (auto& sink : source->sinks) {
+						if (!sink || g_proxies.contains(sink)) {
+							continue;
+						}
+						auto& proxy = g_proxyOf[sink];
+						if (!proxy) {
+							proxy = new ProxySink(sink);
+							g_proxies.insert(proxy);
+						}
+						sink = proxy;
 					}
-					auto& proxy = g_proxyOf[sink];
-					if (!proxy) {
-						proxy = new ProxySink(sink);
-						g_proxies.insert(proxy);
-					}
-					sink = proxy;
 				}
-			}
 
-			Diag::HookStep("sending the frame", "");
-			lock.unlock();
-			g_originalInput(a_source, events);
-			Diag::HookStep("frame sent, waiting for Key Router lock", "");
-			lock.lock();
-			Diag::HookStep("restoring listener list", "");
+				Diag::HookStep("sending the frame", "");
+				a_lock.unlock();
+				g_originalInput(source, &a_frame.head);
+				Diag::HookStep("frame sent, waiting for Key Router lock", "");
+				a_lock.lock();
+				Diag::HookStep("restoring listener list", "");
 
-			{
-				RE::BSSpinLockGuard       sinkLock(a_source->lock);
-				auto&                     array = a_source->sinks;
+				RE::BSSpinLockGuard       sinkLock(source->lock);
+				auto&                     array = source->sinks;
 				std::unordered_set<Sink*> seen;
 				for (std::uint32_t i = 0; i < array.size();) {
 					Sink* sink = Unwrap(array[i]);
@@ -1392,8 +1403,8 @@ namespace Router
 					++i;
 				}
 			}
-			if (head != *a_events) {
-				head->next = nullptr;  // unhook our event from the game's chain
+			if (a_frame.head != *a_frame.original) {
+				a_frame.head->next = nullptr;  // unhook our event from the game's chain
 			}
 			g_traceFrame = false;
 
@@ -1410,9 +1421,9 @@ namespace Router
 			}
 
 			// 5. The delivery this frame carried
-			if (g_delivery && (injectedDown || injectedUp)) {
+			if (g_delivery && (a_frame.injectedDown || a_frame.injectedUp)) {
 				const auto now = NowMs();
-				if (injectedDown) {
+				if (a_frame.injectedDown) {
 					AfterDown(now);
 				} else {
 					logger::info("{}: release delivered to {}", Keys::Name(g_delivery->code), g_delivery->who.display);
@@ -1424,6 +1435,199 @@ namespace Router
 			g_captured.clear();
 			UpdateWork();
 			g_inDispatch = false;
+		}
+
+		// ---- the early hook
+		//
+		// Some mods do not listen for input like other mods: they hook the call in
+		// BSInputDeviceManager::PollInputDevices (ID 68617, +0x7B) that hands the frame to the send
+		// function, and read every key there, before the send function (and so Key Router's send
+		// hook) runs. Modex does this (Hooks.cpp: write_call at 68617 + 0x7B). Key Router could not
+		// hold a key back from them.
+		// The early hook takes that same call over after every plugin has loaded (Modex installs
+		// its hook at kPostLoad, this one at kDataLoaded), so it runs first: it makes the decisions
+		// for the frame, hands the mods in between a copy of the frame without the keys they must
+		// not see, and the send hook then sends the whole frame as usual.
+		// The mods in between are found from the call stack the first times the send hook runs
+		// below the early hook.
+
+		struct EarlyFrame
+		{
+			Frame                                                     frame;
+			bool                                                      prepared{ false };
+			bool                                                      consumed{ false };
+			std::vector<std::pair<RE::InputEvent*, RE::InputEvent*>> links;  // event, its real next
+		};
+
+		thread_local EarlyFrame* t_early = nullptr;
+		InputFn                  g_earlyPrev{ nullptr };
+		std::set<std::string>    g_earlyStems;  // g_lock; lowercase DLL names between the two hooks
+		std::atomic<int>         g_earlyLearns{ 0 };
+
+		void RestoreLinks(EarlyFrame& a_early)
+		{
+			for (auto& [ev, next] : a_early.links) {
+				ev->next = next;
+			}
+			a_early.links.clear();
+		}
+
+		std::string ModuleStemOf(const void* a_address)
+		{
+			HMODULE module = nullptr;
+			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+					static_cast<LPCWSTR>(a_address), &module) ||
+				!module) {
+				return {};
+			}
+			wchar_t path[MAX_PATH]{};
+			if (!GetModuleFileNameW(module, path, MAX_PATH)) {
+				return {};
+			}
+			return Owners::Lower(std::filesystem::path(path).stem().string());
+		}
+
+		// Called in the send hook when it was reached through the early hook: the return addresses
+		// between the two belong to the mods that read the frame in between
+		void LearnEarlyReaders()
+		{
+			if (g_earlyLearns.fetch_add(1) >= 5) {
+				return;
+			}
+			void*      frames[32]{};
+			const auto count = RtlCaptureStackBackTrace(0, 32, frames, nullptr);
+			const auto self = ModuleStemOf(reinterpret_cast<const void*>(&LearnEarlyReaders));
+			std::vector<std::string> found;
+			bool                     leftSelf = false;
+			for (USHORT i = 0; i < count; ++i) {
+				const auto stem = ModuleStemOf(frames[i]);
+				if (stem == self) {
+					if (leftSelf) {
+						break;  // back in the early hook
+					}
+					continue;
+				}
+				leftSelf = true;
+				if (!stem.empty() && stem != "skyrimse" && std::find(found.begin(), found.end(), stem) == found.end()) {
+					found.push_back(stem);
+				}
+			}
+			std::scoped_lock lock(g_lock);
+			for (const auto& stem : found) {
+				if (g_earlyStems.insert(stem).second) {
+					logger::info("{}.dll reads input before the send function; Key Router now holds conflicting keys back from it too", stem);
+				}
+			}
+		}
+
+		// g_lock held. Must this event be kept from the mods between the early hook and the send hook?
+		bool HideFromEarly(RE::InputEvent* a_event)
+		{
+			const auto code = CodeOf(a_event);
+			if (!code || g_earlyStems.empty()) {
+				return false;
+			}
+			const auto& state = g_keys[*code];
+			for (const auto& stem : g_earlyStems) {
+				const auto id = "dll:" + stem;
+				if (IsCandidate(state, id) && !AllowFor(Kind::kDll, id, *code)) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		void Hook_Early(Source* a_source, RE::InputEvent* const* a_events)
+		{
+			if (t_early || a_source != static_cast<Source*>(RE::BSInputDeviceManager::GetSingleton())) {
+				g_earlyPrev(a_source, a_events);
+				return;
+			}
+
+			EarlyFrame      early;
+			RE::InputEvent* passHead = nullptr;
+			{
+				std::unique_lock lock(g_lock);
+				early.prepared = PrepareFrame(a_source, a_events, early.frame);
+				if (early.prepared) {
+					passHead = early.frame.head;
+					std::vector<RE::InputEvent*> kept;
+					bool                         hidden = false;
+					for (auto* e : early.frame.nodes) {
+						if (HideFromEarly(e)) {
+							hidden = true;
+						} else {
+							kept.push_back(e);
+						}
+					}
+					if (hidden) {
+						for (auto* e : early.frame.nodes) {
+							early.links.emplace_back(e, e->next);
+						}
+						for (std::size_t i = 0; i < kept.size(); ++i) {
+							kept[i]->next = i + 1 < kept.size() ? kept[i + 1] : nullptr;
+						}
+						passHead = kept.empty() ? nullptr : kept.front();
+					}
+				}
+			}
+
+			t_early = &early;
+			if (early.prepared) {
+				g_earlyPrev(a_source, &passHead);
+			} else {
+				g_earlyPrev(a_source, a_events);
+			}
+			t_early = nullptr;
+
+			if (early.prepared && !early.consumed) {
+				// nothing below reached the send function: put the chain back, do the bookkeeping
+				RestoreLinks(early);
+				std::unique_lock lock(g_lock);
+				SendFrame(early.frame, lock, false);
+			}
+		}
+
+		void Hook_Input(Source* a_source, RE::InputEvent* const* a_events)
+		{
+			// The send function is only called from the input poll, but only BSInputDeviceManager's own
+			// frames are Key Router's business
+			if (a_source != static_cast<Source*>(RE::BSInputDeviceManager::GetSingleton())) {
+				g_originalInput(a_source, a_events);
+				return;
+			}
+			Diag::CountHookCall(!a_events || !*a_events);
+			Diag::HookEnter();
+			struct LeaveGuard
+			{
+				~LeaveGuard() { Diag::HookLeave(); }
+			} leaveGuard;
+
+			// Reached through the early hook: the frame is already prepared
+			if (auto* early = t_early; early && !early->consumed) {
+				early->consumed = true;
+				RestoreLinks(*early);
+				LearnEarlyReaders();
+				if (!early->prepared) {
+					g_originalInput(a_source, a_events);
+					return;
+				}
+				Diag::HookStep("waiting for Key Router lock", "");
+				std::unique_lock lock(g_lock);
+				SendFrame(early->frame, lock, true);
+				return;
+			}
+
+			Diag::HookStep("waiting for Key Router lock", "");
+			std::unique_lock lock(g_lock);
+			Diag::HookStep("got Key Router lock", "");
+			Frame frame;
+			if (!PrepareFrame(a_source, a_events, frame)) {
+				lock.unlock();
+				g_originalInput(a_source, a_events);
+				return;
+			}
+			SendFrame(frame, lock, true);
 		}
 
 		void Tick()
@@ -1865,8 +2069,51 @@ namespace Router
 		return g_originalSendEvent != nullptr;
 	}
 
+	namespace
+	{
+		// The call in PollInputDevices (ID 68617) that hands the frame to the send function. At
+		// kDataLoaded every plugin has had kPostLoad, where Modex hooks this call; taking it over now
+		// puts Key Router in front of them (see "the early hook" above).
+		// Checked in the decrypted 1.6.1170 image: PollInputDevices +0x7B is an E8 call, rcx = the
+		// manager, rdx = the frame. If the call is not there, or points somewhere unexpected, the
+		// early hook is not installed and everything else works as before.
+		void InstallEarlyHook()
+		{
+			if (!g_originalInput) {
+				return;
+			}
+			REL::Relocation<std::uintptr_t> poll{ REL::ID(68617) };
+			const auto                      site = poll.address() + 0x7B;
+			const auto*                     bytes = reinterpret_cast<const std::uint8_t*>(site);
+			if (bytes[0] != 0xE8) {
+				logger::warn("Early input hook not installed: PollInputDevices +0x7B is not a call ({:02X})", bytes[0]);
+				return;
+			}
+			std::int32_t rel = 0;
+			std::memcpy(&rel, bytes + 1, sizeof(rel));
+			const auto target = site + 5 + static_cast<std::intptr_t>(rel);
+
+			REL::Relocation<std::uintptr_t> sendFn{ REL::ID(68655) };
+			const auto&                     module = REL::Module::get();
+			const auto                      base = module.base();
+			const auto                      text = module.segment(REL::Segment::textx);
+			const auto                      textEnd = text.address() + text.size();
+			const bool                      toSendFn = target == sendFn.address();
+			const bool                      intoGameCode = target >= base && target < textEnd;
+			if (!toSendFn && intoGameCode) {
+				logger::warn("Early input hook not installed: PollInputDevices +0x7B calls game code 0x{:X}, not the send function",
+					target - base);
+				return;
+			}
+			g_earlyPrev = reinterpret_cast<InputFn>(SKSE::GetTrampoline().write_call<5>(site, Hook_Early));
+			logger::info("Early input hook installed at PollInputDevices +0x7B ({})",
+				toSendFn ? std::string("nobody else had hooked it") : std::format("in front of {}.dll", ModuleStemOf(reinterpret_cast<const void*>(target))));
+		}
+	}
+
 	void OnDataLoaded()
 	{
+		InstallEarlyHook();
 		StartTicker();
 	}
 
