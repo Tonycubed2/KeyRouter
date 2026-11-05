@@ -110,7 +110,7 @@ The DLL and PDB are in `build\Release`. Install them with `KeyRouter.ini` into `
 ## License
 - Key Router's own source code: **MIT**, see [LICENSE](LICENSE).
 - `KeyRouter.dll` statically links [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG), which is **GPL-3.0-or-later** with the Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source). So the compiled DLL as a whole is distributed under **GPL-3.0-or-later** with those exceptions. See [GPL-3.0.txt](GPL-3.0.txt) and [CommonLibSSE-NG-EXCEPTIONS.txt](CommonLibSSE-NG-EXCEPTIONS.txt).
-- Corresponding source for each release: this repository at the release tag (for example `v1.5.0`), plus CommonLibSSE NG 6.7.0.
+- Corresponding source for each release: this repository at the release tag (for example `v1.5.1`), plus CommonLibSSE NG 6.7.0.
 - Other libraries in the build (spdlog, {fmt}, DirectXTK, Xbyak, and the SKSE Menu Framework API header) are listed with their licenses in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits

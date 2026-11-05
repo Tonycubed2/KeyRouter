@@ -57,7 +57,11 @@ namespace Keys
 			{ 0xB7, "Snapshot" }, { 0x46, "Scroll" }, { 0xDB, "LWin" }, { 0xDC, "RWin" },
 			{ 0xDD, "Apps" }, { 0xC8, "UpArrow" }, { 0xD0, "DownArrow" }, { 0xCB, "LeftArrow" },
 			{ 0xCD, "RightArrow" }, { 256, "LMB" }, { 257, "RMB" }, { 258, "MMB" },
-			{ 0x56, "OEM_102" }, { 0x56, "IntlBackslash" }, { 0x56, "ISO Backslash" }
+			{ 0x56, "OEM_102" }, { 0x56, "IntlBackslash" }, { 0x56, "ISO Backslash" },
+			// "NumpadAdd" etc. (SkyrimUpscaler); "Numpad" becomes "Num" when names are compared
+			{ 0x4E, "NumAdd" }, { 0x4E, "NumPlus" }, { 0x4A, "NumSubtract" }, { 0x4A, "NumMinus" },
+			{ 0x37, "NumMultiply" }, { 0xB5, "NumDivide" }, { 0x53, "NumDecimal" }, { 0x53, "NumPeriod" },
+			{ 0x53, "NumDel" }, { 0x9C, "NumReturn" }
 		};
 
 		std::unordered_map<std::string, std::uint32_t> g_byName;

@@ -120,7 +120,9 @@ namespace Scanner
 			return KeyValue{ std::move(name), std::move(value) };
 		}
 
-		bool LooksLikeHotkeySetting(const std::string& a_lowerName)
+		// a_hotkeySection: the setting is in a section such as [Hotkeys] or [Keybinds], where the
+		// names need not say "key" (SkyrimUpscaler: [Hotkeys] mTogglePDFrameWarp = NumpadAdd)
+		bool LooksLikeHotkeySetting(const std::string& a_lowerName, bool a_hotkeySection = false)
 		{
 			constexpr std::array want{ "key"sv, "bind"sv, "shortcut"sv };
 			constexpr std::array skip{ "keyword"sv, "keyframe"sv, "monkey"sv, "turkey"sv, "whiskey"sv, "gamepad"sv,
@@ -128,7 +130,8 @@ namespace Scanner
 				"count"sv, "enable"sv, "disable"sv, "length"sv, "speed"sv, "threshold"sv, "sensitivity"sv, "color"sv,
 				"colour"sv, "opacity"sv, "alpha"sv, "scale"sv, "size"sv, "chance"sv, "volume"sv, "cooldown"sv };
 
-			const bool wanted = std::any_of(want.begin(), want.end(), [&](std::string_view w) { return a_lowerName.find(w) != std::string::npos; });
+			const bool wanted = a_hotkeySection ||
+			                    std::any_of(want.begin(), want.end(), [&](std::string_view w) { return a_lowerName.find(w) != std::string::npos; });
 			if (!wanted) {
 				return false;
 			}
@@ -260,7 +263,11 @@ namespace Scanner
 					}
 					continue;
 				}
-				if (!LooksLikeHotkeySetting(lowerName)) {
+				const auto lowerSection = Owners::Lower(section);
+				const bool hotkeySection = lowerSection.find("hotkey") != std::string::npos || lowerSection.find("keybind") != std::string::npos ||
+				                           lowerSection.find("key bind") != std::string::npos || lowerSection.find("shortcut") != std::string::npos ||
+				                           lowerSection == "keys";
+				if (!LooksLikeHotkeySetting(lowerName, hotkeySection)) {
 					continue;
 				}
 				if (a_seenNames) {

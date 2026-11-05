@@ -2105,9 +2105,23 @@ namespace Router
 					target - base);
 				return;
 			}
+			// A hook installed with SKSE's trampoline lands on "jmp [rip+0]" followed by the address
+			auto owner = target;
+			for (int hop = 0; hop < 4; ++hop) {
+				const auto* p = reinterpret_cast<const std::uint8_t*>(owner);
+				if (p[0] == 0xFF && p[1] == 0x25 && p[2] == 0 && p[3] == 0 && p[4] == 0 && p[5] == 0) {
+					std::memcpy(&owner, p + 6, sizeof(owner));
+				} else if (p[0] == 0xE9) {
+					std::int32_t jrel = 0;
+					std::memcpy(&jrel, p + 1, sizeof(jrel));
+					owner = owner + 5 + static_cast<std::intptr_t>(jrel);
+				} else {
+					break;
+				}
+			}
 			g_earlyPrev = reinterpret_cast<InputFn>(SKSE::GetTrampoline().write_call<5>(site, Hook_Early));
 			logger::info("Early input hook installed at PollInputDevices +0x7B ({})",
-				toSendFn ? std::string("nobody else had hooked it") : std::format("in front of {}.dll", ModuleStemOf(reinterpret_cast<const void*>(target))));
+				toSendFn ? std::string("nobody else had hooked it") : std::format("in front of {}.dll", ModuleStemOf(reinterpret_cast<const void*>(owner))));
 		}
 	}
 

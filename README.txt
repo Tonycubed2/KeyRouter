@@ -1,4 +1,4 @@
-Key Router 1.5.0 (BETA)
+Key Router 1.5.1 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -170,3 +170,12 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   Key Router now also hooks that call (PollInputDevices +0x7B), after every plugin has loaded,
   so it runs in front of them: a key in conflict is kept from them until you pick, and they get
   it when you pick them. The mods found reading input there are listed in KeyRouter.log.
+
+1.5.1
+-----
+- Settings in a [Hotkeys] / [Keybinds] / [Shortcuts] / [Keys] section are now read even when
+  their names do not say "key". SkyrimUpscaler's toggles were missed this way
+  ([Hotkeys] mTogglePDFrameWarp = NumpadAdd), so its Num + conflict with CHIM was not shown.
+- Key names "NumpadAdd", "NumpadSubtract", "NumpadMultiply", "NumpadDivide", "NumpadDecimal"
+  are understood.
+- KeyRouter.log now names the mod the early input hook was installed in front of.
