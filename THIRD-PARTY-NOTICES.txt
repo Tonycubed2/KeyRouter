@@ -13,7 +13,7 @@ Key Router's own MIT-licensed code is compatible with that license.
 
   - Full GPL-3.0 text: KeyRouter_GPL-3.0.txt
   - The exceptions: KeyRouter_CommonLibSSE-NG-EXCEPTIONS.txt
-  - Corresponding source: Key Router at https://github.com/Tonycubed2/keyrouter (tag v1.5.1
+  - Corresponding source: Key Router at https://github.com/Tonycubed2/keyrouter (tag v1.5.3
     for this release) and CommonLibSSE NG 6.7.0 at https://github.com/alandtse/CommonLibSSE-NG
 
 Under the Modding Exception, Skyrim and SKSE are not covered by the GPL through this mod.

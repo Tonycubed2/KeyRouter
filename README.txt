@@ -1,4 +1,4 @@
-Key Router 1.5.1 (BETA)
+Key Router 1.5.3 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -179,3 +179,24 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
 - Key names "NumpadAdd", "NumpadSubtract", "NumpadMultiply", "NumpadDivide", "NumpadDecimal"
   are understood.
 - KeyRouter.log now names the mod the early input hook was installed in front of.
+
+1.5.2
+-----
+- DLL mods that read the keyboard themselves every frame (GetAsyncKeyState and friends; for
+  example SkyrimUpscaler, which polls its hotkeys this way) could see a key in the moment
+  between the key going down and Key Router's next input frame, and act on a press Key Router
+  then held back (End opened SkyrimUpscaler's menu even when the press went to another mod).
+  Now such a DLL sees its own hotkeys as up until Key Router has looked at the press (at most
+  0.15 s), then gets them or not as decided.
+
+1.5.3
+-----
+- Window gate: some DLL mods take their hotkeys from the game window's key messages
+  (WM_KEYDOWN) instead of the game's input. SkyrimUpscaler does: its window procedure checks
+  every key message against its hotkeys (End opens its menu). Key Router could not keep a key
+  from it, so End opened its menu even when the press went to another mod. Key Router now sits in
+  front of it on the game window: for a key a DLL mod wants, the message waits until Key Router
+  has decided about the press, then goes through (the pick was that mod) or is dropped (the pick
+  was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
+  itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
+  front of. Part of PollHooks.

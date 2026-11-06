@@ -4,6 +4,7 @@
 
 #include "Choices.h"
 #include "Diag.h"
+#include "Gate.h"
 #include "Keys.h"
 #include "Owners.h"
 #include "Poll.h"
@@ -485,6 +486,7 @@ namespace Router
 			g_keys[a_code] = KeyState{};
 			g_physical[a_code] = false;
 			Poll::Clear(a_code);
+			Poll::Seen(a_code, false);
 		}
 
 		// g_lock held. A key Key Router thinks is still held, but Windows says is up: its release
@@ -1143,6 +1145,7 @@ namespace Router
 			state.owners = a_delivery.who.ids;
 			state.synthetic = a_synthetic;
 			SyncPoll(a_delivery.code);
+			Gate::Kick();
 		}
 
 		// g_lock held. After the press (down) went out, in a frame or directly.
@@ -1305,6 +1308,20 @@ namespace Router
 			// 2. New presses: who wants them?
 			// An SKSE Menu Framework window (its menu, the keyboard map) counts as a menu
 			const bool gameplay = InGameplay() && !Menu::BlockingWindowOpen();
+			// Presses looked at in this frame: DLLs that read the keyboard themselves may see them
+			// once the decision below is in place (Poll::Seen)
+			std::vector<std::uint32_t> seen;
+			struct SeenGuard
+			{
+				std::vector<std::uint32_t>& codes;
+				~SeenGuard()
+				{
+					for (const auto c : codes) {
+						Poll::Seen(c, true);
+					}
+					Gate::Kick();
+				}
+			} seenGuard{ seen };
 			for (std::size_t i = firstReal; i < nodes.size(); ++i) {
 				const auto code = CodeOf(nodes[i]);
 				if (!code) {
@@ -1314,6 +1331,7 @@ namespace Router
 				if (!button->IsDown()) {
 					continue;
 				}
+				seen.push_back(*code);
 				auto& state = g_keys[*code];
 				if (state.mode != Mode::kIdle) {
 					if (Settings::logKeys) {
@@ -1772,6 +1790,7 @@ namespace Router
 		g_delivery = std::move(delivery);
 		SyncPoll(popup.code);
 		UpdateWork();
+		Gate::Kick();
 	}
 
 	namespace
@@ -2128,7 +2147,54 @@ namespace Router
 	void OnDataLoaded()
 	{
 		InstallEarlyHook();
+		if (Settings::pollHooks) {
+			Gate::Install();
+		}
 		StartTicker();
+	}
+
+	namespace
+	{
+		std::string g_windowReader;  // g_lock
+	}
+
+	void SetWindowReader(const std::string& a_stem)
+	{
+		std::scoped_lock lock(g_lock);
+		g_windowReader = a_stem;
+	}
+
+	WindowVerdict WindowKey(std::uint32_t a_code)
+	{
+		std::scoped_lock lock(g_lock);
+		if (!g_originalInput || a_code == 0 || a_code >= Keys::kMaxCode) {
+			return WindowVerdict::kPass;
+		}
+		// Only keys a DLL mod wants: the messages matter to nobody else during play
+		const bool dllWants = std::any_of(Scanner::Dlls().begin(), Scanner::Dlls().end(), [&](const Scanner::Dll& d) {
+			return std::any_of(d.keys.begin(), d.keys.end(), [&](const Scanner::Binding& b) { return b.code == a_code; });
+		});
+		if (!dllWants) {
+			return WindowVerdict::kPass;
+		}
+		const auto& state = g_keys[a_code];
+		switch (state.mode) {
+		case Mode::kIdle:
+			return WindowVerdict::kUndecided;
+		case Mode::kPending:
+		case Mode::kAnswered:
+			return WindowVerdict::kHold;
+		case Mode::kRouted:
+			// Through only when the picked mod is the one that reads these messages (or, when
+			// that is not known, any DLL mod)
+			return std::any_of(state.owners.begin(), state.owners.end(), [](const std::string& id) {
+				return g_windowReader.empty() ? id.starts_with("dll:") : id == "dll:" + g_windowReader;
+			}) ?
+			           WindowVerdict::kPass :
+			           WindowVerdict::kDrop;
+		default:
+			return WindowVerdict::kPass;
+		}
 	}
 
 	void Reset()

@@ -12,6 +12,12 @@ namespace Poll
 	void InstallImportHooks(const std::vector<std::string>& a_dllStems);  // data loaded
 
 	void Set(std::uint32_t a_code, std::vector<std::string> a_blocked, std::string a_forced);
+
+	// The router has looked at the current press of this key (true), or the press ended (false).
+	// Until it has, a watched DLL that reads one of its own hotkeys itself sees that key as up
+	// (at most kDeferMs): such a DLL can poll the keyboard between the key going down and the
+	// router's next input frame, and would otherwise act on a press the router then holds back.
+	void Seen(std::uint32_t a_code, bool a_seen);
 	void Clear(std::uint32_t a_code);
 	void ClearAll();
 }

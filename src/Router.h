@@ -50,4 +50,17 @@ namespace Router
 	// False when key routing is off (KeyRouter.ini Enabled=0): the map then cannot ask the game
 	// which scripts registered which key, and shows only DLL and game controls.
 	bool HooksInstalled();
+
+	// For the window-message gate (Gate.h): what to do with a key message for this key now
+	enum class WindowVerdict
+	{
+		kPass,       // let it through
+		kDrop,       // the press went to a script, the game or nobody
+		kHold,       // the window is up / a pick is being delivered
+		kUndecided   // the router has not seen this press yet
+	};
+	WindowVerdict WindowKey(std::uint32_t a_code);
+
+	// The DLL whose window procedure the gate sits in front of (lowercase name, no .dll)
+	void SetWindowReader(const std::string& a_stem);
 }

@@ -3,6 +3,7 @@
 #include "Diag.h"
 #include "Keys.h"
 #include "Owners.h"
+#include "Scanner.h"
 #include "Settings.h"
 
 #define DIRECTINPUT_VERSION 0x0800
@@ -33,6 +34,52 @@ namespace Poll
 		std::unordered_map<std::uint32_t, Entry> g_table;  // key code -> rule
 		std::unordered_map<HMODULE, std::string> g_watched;  // DLL module -> lowercase name
 		std::atomic<bool>                        g_active{ false };
+		// Deferring a DLL's own hotkeys until the router has seen the press (see Seen in Poll.h)
+		constexpr std::uint64_t                                              kDeferMs = 150;
+		std::unordered_map<std::string, std::unordered_set<std::uint32_t>> g_dllKeys;  // g_lock; DLL -> its hotkeys
+		std::atomic<bool>                                                    g_deferActive{ false };
+		std::array<std::atomic<bool>, Keys::kMaxCode>                        g_seen{};
+		std::array<std::atomic<std::uint64_t>, Keys::kMaxCode>              g_firstDown{};
+
+		std::uint64_t NowMs()
+		{
+			return static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::steady_clock::now().time_since_epoch())
+					.count());
+		}
+
+		bool Active()
+		{
+			return g_active.load(std::memory_order_relaxed) || g_deferActive.load(std::memory_order_relaxed);
+		}
+
+		// g_lock held. Should this DLL see its own hotkey as up for now, because the router has not
+		// looked at this press yet?
+		bool DeferLocked(const std::string& a_dll, std::uint32_t a_code, bool a_realDown)
+		{
+			if (a_code == 0 || a_code >= Keys::kMaxCode) {
+				return false;
+			}
+			if (!a_realDown) {
+				g_firstDown[a_code] = 0;
+				return false;
+			}
+			if (g_seen[a_code].load()) {
+				return false;
+			}
+			const auto it = g_dllKeys.find(a_dll);
+			if (it == g_dllKeys.end() || !it->second.contains(a_code)) {
+				return false;
+			}
+			const auto now = NowMs();
+			auto       first = g_firstDown[a_code].load();
+			if (first == 0) {
+				g_firstDown[a_code] = now;
+				first = now;
+			}
+			return now - first < kDeferMs;  // the router normally sees it within one or two frames
+		}
+
 		HMODULE                                  g_exe = nullptr;
 		HMODULE                                  g_self = nullptr;
 
@@ -68,15 +115,22 @@ namespace Poll
 			return Verdict::kPass;
 		}
 
-		Verdict Decide(const void* a_returnAddress, std::uint32_t a_code)
+		Verdict Decide(const void* a_returnAddress, std::uint32_t a_code, bool a_realDown)
 		{
-			if (!g_active.load(std::memory_order_relaxed) || a_code == 0) {
+			if (!Active() || a_code == 0) {
 				return Verdict::kPass;
 			}
 			const auto       module = ModuleOf(a_returnAddress);
 			std::scoped_lock lock(g_lock);
 			const auto*      dll = WatchedLocked(module);
-			return dll ? DecideLocked(*dll, a_code) : Verdict::kPass;
+			if (!dll) {
+				return Verdict::kPass;
+			}
+			const auto verdict = DecideLocked(*dll, a_code);
+			if (verdict == Verdict::kPass && DeferLocked(*dll, a_code, a_realDown)) {
+				return Verdict::kBlock;
+			}
+			return verdict;
 		}
 
 		// ---------------------------------------------------------------- user32 reads
@@ -94,10 +148,11 @@ namespace Poll
 		SHORT WINAPI Hook_GetAsyncKeyState(int a_vk)
 		{
 			const SHORT result = g_realGetAsyncKeyState(a_vk);
-			if (!g_active.load(std::memory_order_relaxed)) {
+			if (!Active()) {
 				return result;
 			}
-			switch (Decide(_ReturnAddress(), Keys::VkToDx(static_cast<std::uint32_t>(a_vk) & 0xFF))) {
+			const bool down = (static_cast<std::uint16_t>(result) & kDownBit) != 0;
+			switch (Decide(_ReturnAddress(), Keys::VkToDx(static_cast<std::uint32_t>(a_vk) & 0xFF), down)) {
 			case Verdict::kBlock:
 				return 0;
 			case Verdict::kForce:
@@ -110,11 +165,11 @@ namespace Poll
 		SHORT WINAPI Hook_GetKeyState(int a_vk)
 		{
 			const SHORT result = g_realGetKeyState(a_vk);
-			if (!g_active.load(std::memory_order_relaxed)) {
+			if (!Active()) {
 				return result;
 			}
 			const auto bits = static_cast<std::uint16_t>(result);
-			switch (Decide(_ReturnAddress(), Keys::VkToDx(static_cast<std::uint32_t>(a_vk) & 0xFF))) {
+			switch (Decide(_ReturnAddress(), Keys::VkToDx(static_cast<std::uint32_t>(a_vk) & 0xFF), (bits & kDownBit) != 0)) {
 			case Verdict::kBlock:
 				return static_cast<SHORT>(bits & 0x0001);  // keep only the toggle bit
 			case Verdict::kForce:
@@ -127,7 +182,7 @@ namespace Poll
 		BOOL WINAPI Hook_GetKeyboardState(PBYTE a_state)
 		{
 			const BOOL ok = g_realGetKeyboardState(a_state);
-			if (!ok || !a_state || !g_active.load(std::memory_order_relaxed)) {
+			if (!ok || !a_state || !Active()) {
 				return ok;
 			}
 			const auto       module = ModuleOf(_ReturnAddress());
@@ -141,7 +196,11 @@ namespace Poll
 				if (!code) {
 					continue;
 				}
-				switch (DecideLocked(*dll, code)) {
+				auto verdict = DecideLocked(*dll, code);
+				if (verdict == Verdict::kPass && DeferLocked(*dll, code, (a_state[vk] & 0x80) != 0)) {
+					verdict = Verdict::kBlock;
+				}
+				switch (verdict) {
 				case Verdict::kBlock:
 					a_state[vk] &= 0x01;
 					break;
@@ -241,7 +300,7 @@ namespace Poll
 				return DIERR_GENERIC;
 			}
 			const HRESULT hr = reinterpret_cast<GetDeviceState_t>(d->getDeviceState)(a_self, a_size, a_data);
-			if (FAILED(hr) || !a_data || a_size != 256 || !g_active.load(std::memory_order_relaxed)) {
+			if (FAILED(hr) || !a_data || a_size != 256 || !Active()) {
 				return hr;
 			}
 			const auto module = ModuleOf(_ReturnAddress());
@@ -253,6 +312,13 @@ namespace Poll
 			const auto*      dll = WatchedLocked(module);
 			if (!dll) {
 				return hr;
+			}
+			if (const auto own = g_dllKeys.find(*dll); own != g_dllKeys.end()) {
+				for (const auto code : own->second) {
+					if (code < 256 && DecideLocked(*dll, code) == Verdict::kPass && DeferLocked(*dll, code, (keys[code] & 0x80) != 0)) {
+						keys[code] = 0;
+					}
+				}
 			}
 			for (const auto& [code, entry] : g_table) {
 				if (code >= 256) {
@@ -281,6 +347,7 @@ namespace Poll
 			}
 			const HRESULT hr = reinterpret_cast<GetDeviceData_t>(d->getDeviceData)(a_self, a_objectSize, a_data, a_count, a_flags);
 			if (FAILED(hr) || !a_data || !a_count || a_objectSize < sizeof(DIDEVICEOBJECTDATA) || !g_active.load(std::memory_order_relaxed)) {
+				// buffered DirectInput reads are not deferred: they are events, not a polled state
 				return hr;
 			}
 			{
@@ -414,6 +481,17 @@ namespace Poll
 			{
 				std::scoped_lock lock(g_lock);
 				g_watched[handle] = module.stem;
+				auto& own = g_dllKeys[module.stem];
+				for (const auto& dll : Scanner::Dlls()) {
+					if (dll.stem == module.stem) {
+						for (const auto& b : dll.keys) {
+							own.insert(b.code);
+						}
+					}
+				}
+				if (!own.empty()) {
+					g_deferActive = true;
+				}
 			}
 			if (!canHook) {
 				continue;
@@ -445,5 +523,15 @@ namespace Poll
 		std::scoped_lock lock(g_lock);
 		g_table.clear();
 		g_active = false;
+		for (auto& s : g_seen) {
+			s = false;
+		}
+	}
+
+	void Seen(std::uint32_t a_code, bool a_seen)
+	{
+		if (a_code < Keys::kMaxCode) {
+			g_seen[a_code] = a_seen;
+		}
 	}
 }

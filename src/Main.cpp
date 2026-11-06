@@ -1,4 +1,4 @@
-// Key Router 1.5.1
+// Key Router 1.5.3
 // Built against CommonLibSSE-NG 6.7.0 for Skyrim AE 1.6.1170 (and 1.7.99).
 //
 // Finds key presses that more than one mod wants (Papyrus scripts, SKSE DLL mods, and the
@@ -20,7 +20,7 @@
 #include "Viewer.h"
 
 SKSEPluginInfo(
-	.Version = REL::Version{ 1, 5, 1, 0 },
+	.Version = REL::Version{ 1, 5, 3, 0 },
 	.Name = "KeyRouter"sv,
 	.Author = "tonycubed2"sv,
 	.StructCompatibility = SKSE::StructCompatibility::Independent,
@@ -73,7 +73,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 
-	logger::info("Key Router 1.5.1 loading; game runtime {}", REL::Module::get().version().string());
+	logger::info("Key Router 1.5.3 loading; game runtime {}", REL::Module::get().version().string());
 
 	Settings::Load();
 	Keys::Init();
