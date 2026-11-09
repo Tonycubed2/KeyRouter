@@ -219,6 +219,18 @@ namespace Menu
 			save |= Check("Also check while menus are open", Settings::checkInMenus);
 			Help("Off: only during normal play. Skyrim's own controls are never counted in menus.");
 
+			SeparatorText("Conflict window");
+			{
+				int mode = Settings::quickConflict ? 1 : 0;
+				bool changed = RadioButton("Regular (window with buttons, Remember my choice)", &mode, 0);
+				changed |= RadioButton("Quick (list at the mouse pointer: wheel to move, click or Enter to pick, Esc = nobody)", &mode, 1);
+				if (changed && (mode == 1) != Settings::quickConflict) {
+					Settings::quickConflict = mode == 1;
+					save = true;
+				}
+				Help("Quick needs SKSE Menu Framework and has no Remember my choice. Remembered choices still apply in both modes.");
+			}
+
 			SeparatorText("Finding hotkeys");
 			save |= Check("Read the config files of SKSE DLL mods (restart)", Settings::scanDllConfigs);
 			save |= Check("Watch DLLs that read the keyboard themselves (restart)", Settings::pollHooks);

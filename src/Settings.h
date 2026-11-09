@@ -16,7 +16,8 @@ namespace Settings
 	inline std::atomic<bool>          directInputHooks{ true };      // needs a restart
 	inline std::atomic<std::uint32_t> syntheticPressMs{ 50 };
 	inline std::atomic<bool>          logKeys{ false };              // one log line per key press: who wanted it and what happened
-	inline std::atomic<bool>          diagnostics{ false };          // [diag] lines: input hook rate, game state and handlers on each replayed press
+	inline std::atomic<bool>          diagnostics{ false };
+	inline std::atomic<bool>          quickConflict{ false };        // ConflictWindow=Quick: the wheel list instead of the message box          // [diag] lines: input hook rate, game state and handlers on each replayed press
 
 	// [KillSwitch]
 	inline std::atomic<bool>          killSwitchEnabled{ true };

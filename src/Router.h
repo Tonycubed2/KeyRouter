@@ -14,6 +14,13 @@ namespace Router
 	void Reset();          // new game / save loaded
 	void OnPopupAnswer(std::uint32_t a_popupId, std::uint8_t a_button);
 
+	// Quick mode: a_index = which mod (0-based, in the window's order); the mod count means Nobody
+	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index);
+
+	// Mods whose keys live in the save, asked at run time (Spell Hotbar's Shift/Ctrl/Alt bars).
+	// Main thread; called after a game is loaded or started.
+	void AskModsForKeys();
+
 	// ---- keyboard map
 
 	// How one mod's use of a key can be changed
@@ -23,6 +30,7 @@ namespace Router
 		std::optional<Scanner::Origin> origin;  // DLL config setting Key Router can rewrite (Movable())
 		std::uint32_t                  code{ 0 };
 		std::vector<std::uint8_t>      modGroups;  // Shift/Ctrl/Alt that stay with the key
+		std::string                    source;     // where the key is set, when not a file (shown as the source)
 	};
 
 	struct KeyBind

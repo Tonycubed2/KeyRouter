@@ -1,4 +1,4 @@
-Key Router 1.5.3 (BETA)
+Key Router 1.6.0 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -200,3 +200,18 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.0
+-----
+- Quick conflict window (Settings: Conflict window = Quick, or ConflictWindow=Quick in
+  KeyRouter.ini): a small list of the mods at the mouse pointer. Mouse wheel moves the
+  highlight (the wheel goes to nothing else while the list is open), left click or Enter picks,
+  Esc means nobody. The game pauses while it is open. No Remember my choice in quick mode;
+  remembered choices still apply. Needs SKSE Menu Framework.
+- Spell Hotbar's Shift/Ctrl/Alt bars are now detected. Spell Hotbar keeps its settings in the
+  save, so Key Router asks Spell Hotbar itself after a game is loaded (its isShiftBarEnabled /
+  isCtrlBarEnabled / isAltBarEnabled functions). When a bar is on, Left and Right Shift (Ctrl,
+  Alt) count as Spell Hotbar keys.
+- Mods that read input before the game's input function but pass the frame on with a tail jump
+  (Spell Hotbar) left no trace for the early hook to find; a key in conflict is now kept from
+  every DLL competitor there unless the press went to a DLL mod.

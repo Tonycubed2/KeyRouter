@@ -111,6 +111,7 @@ namespace Settings
 				{ "general", "SyntheticPressMs", std::to_string(syntheticPressMs.load()) },
 				{ "general", "LogKeys", b(logKeys) },
 				{ "general", "Diagnostics", b(diagnostics) },
+				{ "general", "ConflictWindow", quickConflict ? "Quick" : "Regular" },
 				{ "killswitch", "Enabled", b(killSwitchEnabled) },
 				{ "killswitch", "Key", killSwitchKey },
 				{ "killswitch", "HoldSeconds", std::to_string(killSwitchHoldSeconds.load()) },
@@ -170,6 +171,15 @@ namespace Settings
 					diagnostics = ToBool(e, diagnostics);
 				} else if (e.key == "logkeys") {
 					logKeys = ToBool(e, logKeys);
+				} else if (e.key == "conflictwindow") {
+					const auto v = Lower(e.value);
+					if (v == "quick") {
+						quickConflict = true;
+					} else if (v == "regular") {
+						quickConflict = false;
+					} else {
+						logger::warn("Bad value for ConflictWindow: '{}' (Regular or Quick), keeping {}", e.value, quickConflict ? "Quick" : "Regular");
+					}
 				} else if (e.key == "syntheticpressms") {
 					ReadNumber(e, syntheticPressMs, kPressMsMin, kPressMsMax);
 				}
@@ -218,6 +228,7 @@ namespace Settings
 			enabled.load(), includeGameControls.load(), includeMouseButtons.load(), checkInMenus.load());
 		logger::info("Settings: ScanDllConfigs={} PollHooks={} DirectInputHooks={} SyntheticPressMs={} LogKeys={} Diagnostics={}",
 			scanDllConfigs.load(), pollHooks.load(), directInputHooks.load(), syntheticPressMs.load(), logKeys.load(), diagnostics.load());
+		logger::info("Settings: ConflictWindow={}", quickConflict ? "Quick" : "Regular");
 		logger::info("Settings: KillSwitch Enabled={} Key={} HoldSeconds={}", killSwitchEnabled.load(), killSwitchKey, killSwitchHoldSeconds.load());
 		logger::info("Settings: KeyboardMap Enabled={} Key={} HoldSeconds={} Layout={}", mapEnabled.load(), mapKey, mapHoldSeconds.load(),
 			mapLayout == kLayoutUK ? "UK" : "US");

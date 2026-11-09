@@ -37,6 +37,7 @@ add_library(${PROJECT_NAME} SHARED
 	src/Menu.cpp
 	src/Fix.cpp
 	src/Gate.cpp
+	src/Quick.cpp
 	src/PCH.h
 	src/Choices.h
 	src/Diag.h
@@ -51,6 +52,7 @@ add_library(${PROJECT_NAME} SHARED
 	src/Menu.h
 	src/Fix.h
 	src/Gate.h
+	src/Quick.h
 	src/SKSEMenuFramework.h
 )
 

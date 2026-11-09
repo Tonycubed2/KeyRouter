@@ -1,4 +1,4 @@
-// Key Router 1.5.3
+// Key Router 1.6.0
 // Built against CommonLibSSE-NG 6.7.0 for Skyrim AE 1.6.1170 (and 1.7.99).
 //
 // Finds key presses that more than one mod wants (Papyrus scripts, SKSE DLL mods, and the
@@ -14,13 +14,14 @@
 #include "KillSwitch.h"
 #include "Menu.h"
 #include "Poll.h"
+#include "Quick.h"
 #include "Router.h"
 #include "Scanner.h"
 #include "Settings.h"
 #include "Viewer.h"
 
 SKSEPluginInfo(
-	.Version = REL::Version{ 1, 5, 3, 0 },
+	.Version = REL::Version{ 1, 6, 0, 0 },
 	.Name = "KeyRouter"sv,
 	.Author = "tonycubed2"sv,
 	.StructCompatibility = SKSE::StructCompatibility::Independent,
@@ -39,6 +40,7 @@ namespace
 		case SKSE::MessagingInterface::kPostLoad:
 			// every plugin is loaded: SKSE Menu Framework can be asked for windows and pages
 			Viewer::Start();
+			Quick::Start();
 			Menu::Register();
 			break;
 		case SKSE::MessagingInterface::kDataLoaded:
@@ -61,6 +63,7 @@ namespace
 		case SKSE::MessagingInterface::kNewGame:
 			if (g_routing) {
 				Router::Reset();
+				Router::AskModsForKeys();
 			}
 			break;
 		default:
@@ -73,7 +76,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
 	SKSE::Init(a_skse);
 
-	logger::info("Key Router 1.5.3 loading; game runtime {}", REL::Module::get().version().string());
+	logger::info("Key Router 1.6.0 loading; game runtime {}", REL::Module::get().version().string());
 
 	Settings::Load();
 	Keys::Init();

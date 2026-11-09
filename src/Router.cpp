@@ -8,6 +8,7 @@
 #include "Keys.h"
 #include "Owners.h"
 #include "Poll.h"
+#include "Quick.h"
 #include "Scanner.h"
 #include "Settings.h"
 
@@ -158,6 +159,16 @@ namespace Router
 		};
 
 		std::recursive_mutex g_lock;
+
+		// Keys learned at run time from mods that keep them in the save (AskModsForKeys); g_lock
+		struct ExtraBind
+		{
+			std::string   stem;     // "spellhotbar"
+			std::string   display;  // "SpellHotbar.dll"
+			std::string   setting;  // how to change it
+			std::uint32_t code{ 0 };
+		};
+		std::vector<ExtraBind> g_extra;
 
 		// ---- state (g_lock)
 		std::array<KeyState, Keys::kMaxCode> g_keys;
@@ -917,6 +928,12 @@ namespace Router
 				}
 			}
 
+			for (const auto& e : g_extra) {
+				if (e.code == a_code) {
+					add(MakeCandidate({ Kind::kDll, "dll:" + e.stem, e.display }));
+				}
+			}
+
 			if (Settings::includeGameControls && a_gameplay) {
 				if (const auto userEvent = GameUserEvent(a_code); !userEvent.empty()) {
 					Candidate game;
@@ -1004,6 +1021,22 @@ namespace Router
 
 		void ShowPopup(const Popup& a_popup)
 		{
+			if (Settings::quickConflict && Quick::Available()) {
+				std::vector<std::string> names;
+				for (const auto& c : a_popup.candidates) {
+					names.push_back(Shorten(c.display, 48));
+				}
+				names.emplace_back("Nobody");
+				const auto id = a_popup.id;
+				auto       title = std::format("{}: which mod gets it?", Keys::Name(a_popup.code));
+				if (auto* task = SKSE::GetTaskInterface()) {
+					task->AddTask([id, title = std::move(title), names = std::move(names)]() mutable {
+						Quick::Open(id, std::move(title), std::move(names));
+					});
+					return;
+				}
+			}
+
 			auto body = std::format(
 				"Key Router\n\n{} is assigned to more than one mod.\nWhich one should get this key press?\n\n{}",
 				Keys::Name(a_popup.code),
@@ -1273,6 +1306,47 @@ namespace Router
 					logger::info("[diag] replay goes to {}", g_delivery->who.display);
 				}
 			}
+			// Quick list open: the wheel belongs to it (taken out of the frame for everyone), Enter picks
+			if (Quick::OpenId() != 0 && head) {
+				int             steps = 0;
+				bool            enter = false;
+				RE::InputEvent* first = nullptr;
+				RE::InputEvent* last = nullptr;
+				for (auto* e = head; e;) {
+					auto* next = e->next;
+					bool  wheel = false;
+					if (auto* b = e->GetEventType() == RE::INPUT_EVENT_TYPE::kButton ? e->AsButtonEvent() : nullptr) {
+						if (b->GetDevice() == RE::INPUT_DEVICE::kMouse && (b->GetIDCode() == 8 || b->GetIDCode() == 9)) {
+							wheel = true;
+							if (b->IsDown()) {
+								steps += b->GetIDCode() == 8 ? 1 : -1;
+							}
+						} else if (b->IsDown() && ((b->GetDevice() == RE::INPUT_DEVICE::kKeyboard && (b->GetIDCode() == 0x1C || b->GetIDCode() == 0x9C)) ||
+													  (b->GetDevice() == RE::INPUT_DEVICE::kMouse && b->GetIDCode() == 2))) {
+							enter = true;  // Enter or a wheel click
+						}
+					}
+					if (!wheel) {
+						if (last) {
+							last->next = e;
+						} else {
+							first = e;
+						}
+						last = e;
+					}
+					e = next;
+				}
+				if (last) {
+					last->next = nullptr;
+				}
+				head = first;
+				if (steps != 0) {
+					Quick::Wheel(steps);
+				}
+				if (enter) {
+					Quick::PickHighlighted();
+				}
+			}
 			if (!head) {
 				return false;
 			}
@@ -1401,9 +1475,37 @@ namespace Router
 					}
 				}
 
+				// While the quick list is open (and just after), mouse buttons and Enter are the
+				// list's: the game does not get them (no swing from the click that picks)
+				std::vector<std::pair<RE::InputEvent*, RE::InputEvent*>> links;
+				RE::InputEvent*                                         sendHead = a_frame.head;
+				if (Quick::MouseExclusive()) {
+					std::vector<RE::InputEvent*> kept;
+					for (auto* e : nodes) {
+						auto* b = e->GetEventType() == RE::INPUT_EVENT_TYPE::kButton ? e->AsButtonEvent() : nullptr;
+						const bool listInput = b && (b->GetDevice() == RE::INPUT_DEVICE::kMouse ||
+														(b->GetDevice() == RE::INPUT_DEVICE::kKeyboard && (b->GetIDCode() == 0x1C || b->GetIDCode() == 0x9C)));
+						if (!listInput) {
+							kept.push_back(e);
+						}
+					}
+					if (kept.size() != nodes.size()) {
+						for (auto* e : nodes) {
+							links.emplace_back(e, e->next);
+						}
+						for (std::size_t i = 0; i < kept.size(); ++i) {
+							kept[i]->next = i + 1 < kept.size() ? kept[i + 1] : nullptr;
+						}
+						sendHead = kept.empty() ? nullptr : kept.front();
+					}
+				}
+
 				Diag::HookStep("sending the frame", "");
 				a_lock.unlock();
-				g_originalInput(source, &a_frame.head);
+				g_originalInput(source, &sendHead);
+				for (auto& [ev, next] : links) {
+					ev->next = next;
+				}
 				Diag::HookStep("frame sent, waiting for Key Router lock", "");
 				a_lock.lock();
 				Diag::HookStep("restoring listener list", "");
@@ -1421,7 +1523,7 @@ namespace Router
 					++i;
 				}
 			}
-			if (a_frame.head != *a_frame.original) {
+			if (a_frame.injectedDown || a_frame.injectedUp) {
 				a_frame.head->next = nullptr;  // unhook our event from the game's chain
 			}
 			g_traceFrame = false;
@@ -1542,7 +1644,7 @@ namespace Router
 		bool HideFromEarly(RE::InputEvent* a_event)
 		{
 			const auto code = CodeOf(a_event);
-			if (!code || g_earlyStems.empty()) {
+			if (!code) {
 				return false;
 			}
 			const auto& state = g_keys[*code];
@@ -1552,7 +1654,24 @@ namespace Router
 					return true;
 				}
 			}
-			return false;
+			// Readers the call stack cannot show: a mod that passes the frame on with a tail jump
+			// leaves no trace (Spell Hotbar does). Keep a key in conflict from every DLL competitor
+			// here, unless the press went to a DLL mod (it may be one of them).
+			const auto isDll = [](const std::string& id) { return id.starts_with("dll:"); };
+			const bool dllCompetes = std::any_of(state.candidates.begin(), state.candidates.end(),
+				[&](const Candidate& c) { return std::any_of(c.ids.begin(), c.ids.end(), isDll); });
+			if (!dllCompetes) {
+				return false;
+			}
+			switch (state.mode) {
+			case Mode::kPending:
+			case Mode::kAnswered:
+				return true;
+			case Mode::kRouted:
+				return std::none_of(state.owners.begin(), state.owners.end(), isDll);
+			default:
+				return false;
+			}
 		}
 
 		void Hook_Early(Source* a_source, RE::InputEvent* const* a_events)
@@ -1653,14 +1772,18 @@ namespace Router
 			std::unique_lock lock(g_lock);
 			const auto       now = NowMs();
 			auto*            ui = RE::UI::GetSingleton();
-			const bool       boxOpen = ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME);
+			const bool       quickOpen = Quick::IsOpen();
+			const bool       boxOpen = quickOpen || (ui && ui->IsMenuOpen(RE::MessageBoxMenu::MENU_NAME));
 
 			if (g_popup) {
 				auto& popup = *g_popup;
-				if (boxOpen) {
+				const bool shown = quickOpen ? Quick::OpenId() == popup.id : boxOpen;
+				// the quick list closed by Esc: Nobody at once; the message box may blink while it re-opens
+				const std::uint64_t grace = Quick::OpenId() == 0 && Settings::quickConflict ? 0 : 1000;
+				if (shown) {
 					popup.seenOpen = true;
 					popup.lastSeenOpen = now;
-				} else if ((popup.seenOpen && now - popup.lastSeenOpen > 1000) || (!popup.seenOpen && now - popup.createdAt > 15000)) {
+				} else if ((popup.seenOpen && now - popup.lastSeenOpen > grace) || (!popup.seenOpen && now - popup.createdAt > 15000)) {
 					const auto id = popup.id;
 					logger::warn("{}: the Key Router window closed without an answer; nobody gets this press", Keys::Name(popup.code));
 					lock.unlock();
@@ -1734,6 +1857,9 @@ namespace Router
 	void OnPopupAnswer(std::uint32_t a_popupId, std::uint8_t a_button)
 	{
 		std::scoped_lock lock(g_lock);
+		if (Quick::OpenId() == a_popupId) {
+			Quick::Close();
+		}
 		if (!g_popup || g_popup->id != a_popupId) {
 			logger::info("Answer for an old Key Router window ignored");
 			return;
@@ -1791,6 +1917,72 @@ namespace Router
 		SyncPoll(popup.code);
 		UpdateWork();
 		Gate::Kick();
+	}
+
+	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index)
+	{
+		OnPopupAnswer(a_popupId, static_cast<std::uint8_t>(kButtonOffset + std::clamp(a_index, 0, 200)));
+	}
+
+	namespace
+	{
+		class BoolResult final : public RE::BSScript::IStackCallbackFunctor
+		{
+		public:
+			explicit BoolResult(std::function<void(bool)> a_fn) :
+				_fn(std::move(a_fn))
+			{}
+
+			void operator()(RE::BSScript::Variable a_result) override { _fn(a_result.IsBool() && a_result.GetBool()); }
+			void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
+
+		private:
+			std::function<void(bool)> _fn;
+		};
+	}
+
+	void AskModsForKeys()
+	{
+		// Spell Hotbar (Nexus 110763) keeps its settings in the save. Its Shift/Ctrl/Alt bars switch
+		// while Left or Right Shift/Ctrl/Alt is held (its source: input.cpp KeyModifier mod_shift(42, 54),
+		// mod_ctrl(29, 157), mod_alt(56, 184); hotbars.cpp get_current_modifier). Whether each bar is on
+		// comes from its own Papyrus functions SpellHotbar.isShiftBarEnabled / isCtrlBarEnabled /
+		// isAltBarEnabled (present in the installed SpellHotbar.dll).
+		{
+			std::scoped_lock lock(g_lock);
+			g_extra.clear();
+		}
+		auto* data = RE::TESDataHandler::GetSingleton();
+		auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+		if (!data || !vm || !data->LookupModByName("SpellHotbar.esp") || !GetModuleHandleW(L"SpellHotbar.dll")) {
+			return;
+		}
+		struct Query
+		{
+			const char*   function;
+			const char*   bar;
+			std::uint32_t left;
+			std::uint32_t right;
+		};
+		static constexpr Query queries[] = {
+			{ "isShiftBarEnabled", "Shift bar", 0x2A, 0x36 },
+			{ "isCtrlBarEnabled", "Ctrl bar", 0x1D, 0x9D },
+			{ "isAltBarEnabled", "Alt bar", 0x38, 0xB8 },
+		};
+		for (const auto& q : queries) {
+			RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback{ new BoolResult([q](bool a_on) {
+				logger::info("Spell Hotbar: {} is {}", q.bar, a_on ? "on" : "off");
+				if (!a_on) {
+					return;
+				}
+				std::scoped_lock lock(g_lock);
+				for (const auto code : { q.left, q.right }) {
+					g_extra.push_back({ "spellhotbar", "SpellHotbar.dll",
+						std::format("Spell Hotbar: {} is on (turn it off in Spell Hotbar's MCM to free this key)", q.bar), code });
+				}
+			}) };
+			vm->DispatchStaticCall(RE::BSFixedString{ "SpellHotbar" }, RE::BSFixedString{ q.function }, RE::MakeFunctionArguments(), callback);
+		}
 	}
 
 	namespace
@@ -1935,6 +2127,21 @@ namespace Router
 					}
 				}
 			}
+			// Keys learned at run time (Spell Hotbar's modifier bars)
+			for (const auto& e : g_extra) {
+				if (e.code != code) {
+					continue;
+				}
+				auto c = MakeCandidate({ Kind::kDll, "dll:" + e.stem, e.display });
+				HowTo how;
+				how.text = e.setting;
+				how.code = code;
+				how.source = "Spell Hotbar setting (in the save)";
+				dllHow["dll:" + e.stem].push_back(std::move(how));
+				if (std::none_of(plain.begin(), plain.end(), [&](const Candidate& x) { return x.ids == c.ids; })) {
+					plain.push_back(std::move(c));
+				}
+			}
 
 			// Skyrim's own controls during play
 			std::string userEvent;
@@ -1988,7 +2195,8 @@ namespace Router
 					} else if (id.starts_with("dll:")) {
 						if (const auto it = dllHow.find(id); it != dllHow.end()) {
 							for (const auto& h : it->second) {
-								sources.push_back(h.origin ? std::format("{}: {}", h.origin->FileName(), h.origin->setting) : std::string("KeyRouter.ini [DllKeys]"));
+								sources.push_back(h.origin ? std::format("{}: {}", h.origin->FileName(), h.origin->setting) :
+								                  !h.source.empty() ? h.source : std::string("KeyRouter.ini [DllKeys]"));
 								kb.howTo.push_back(h);
 							}
 						}
@@ -2174,7 +2382,7 @@ namespace Router
 		const bool dllWants = std::any_of(Scanner::Dlls().begin(), Scanner::Dlls().end(), [&](const Scanner::Dll& d) {
 			return std::any_of(d.keys.begin(), d.keys.end(), [&](const Scanner::Binding& b) { return b.code == a_code; });
 		});
-		if (!dllWants) {
+		if (!dllWants && std::none_of(g_extra.begin(), g_extra.end(), [&](const ExtraBind& e) { return e.code == a_code; })) {
 			return WindowVerdict::kPass;
 		}
 		const auto& state = g_keys[a_code];
