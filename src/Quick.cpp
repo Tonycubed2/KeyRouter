@@ -77,7 +77,8 @@ namespace Quick
 			SetNextWindowBgAlpha(0.96F);
 			if (!Begin("##KeyRouterQuick", nullptr,
 					ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
-						ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
+						ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+						ImGuiWindowFlags_NoNav)) {  // no keyboard navigation: with it, Enter "activated" the first line instead of the highlighted one
 				End();
 				return;
 			}
@@ -116,7 +117,7 @@ namespace Quick
 				answer = TakeAnswer(g_highlight);
 			}
 			Separator();
-			TextDisabled("Wheel: move   Click, wheel click or Enter: pick   Esc: nobody");
+			TextDisabled("Wheel or Up/Down: move   Click, wheel click or Enter: pick   Esc: nobody");
 			End();
 			lock.unlock();
 			Send(answer);

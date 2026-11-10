@@ -1306,7 +1306,8 @@ namespace Router
 					logger::info("[diag] replay goes to {}", g_delivery->who.display);
 				}
 			}
-			// Quick list open: the wheel belongs to it (taken out of the frame for everyone), Enter picks
+			// Quick list open: the wheel and the Up/Down arrows belong to it (taken out of the frame for
+			// everyone) and move the highlight; Enter or a wheel click picks
 			if (Quick::OpenId() != 0 && head) {
 				int             steps = 0;
 				bool            enter = false;
@@ -1320,6 +1321,11 @@ namespace Router
 							wheel = true;
 							if (b->IsDown()) {
 								steps += b->GetIDCode() == 8 ? 1 : -1;
+							}
+						} else if (b->GetDevice() == RE::INPUT_DEVICE::kKeyboard && (b->GetIDCode() == 0xC8 || b->GetIDCode() == 0xD0)) {
+							wheel = true;  // Up / Down arrow: same as a wheel notch
+							if (b->IsDown()) {
+								steps += b->GetIDCode() == 0xC8 ? 1 : -1;
 							}
 						} else if (b->IsDown() && ((b->GetDevice() == RE::INPUT_DEVICE::kKeyboard && (b->GetIDCode() == 0x1C || b->GetIDCode() == 0x9C)) ||
 													  (b->GetDevice() == RE::INPUT_DEVICE::kMouse && b->GetIDCode() == 2))) {

@@ -1,4 +1,4 @@
-Key Router 1.6.0 (BETA)
+Key Router 1.6.1 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -200,6 +200,15 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.1
+-----
+- Quick conflict window: Enter now picks the highlighted line. SKSE Menu Framework turns on
+  ImGui keyboard navigation, so Enter "activated" the first line of the list (whatever the wheel
+  had highlighted). Navigation is now off for the list: Enter, keypad Enter and a wheel click
+  pick the highlighted line, and a left click picks the line under the pointer.
+- Quick conflict window: the Up and Down arrow keys move the highlight too, like the mouse
+  wheel. While the list is open they go to the list only.
 
 1.6.0
 -----
