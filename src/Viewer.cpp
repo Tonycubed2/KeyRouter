@@ -709,6 +709,13 @@ namespace Viewer
 				if (!entry.remembered.empty()) {
 					tip += std::format("\nRemembered choice: {}", entry.remembered);
 				}
+				// the number mod config files use for this key (DirectX scan code; SKSE's 256+ for mouse buttons)
+				const auto code = hoverKey->code;
+				if (code >= Keys::kMouseBase && code <= Keys::kMouseLast) {
+					tip += std::format("\n\nKey code: {} (mouse button)", code);
+				} else {
+					tip += std::format("\n\nScan code: {} (hex 0x{:02X})", code, code);
+				}
 				SetTooltip("%s", tip.c_str());
 			}
 

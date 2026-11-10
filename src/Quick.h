@@ -14,6 +14,9 @@ namespace Quick
 	void Open(std::uint32_t a_popupId, std::string a_title, std::vector<std::string> a_names);
 	bool IsOpen();
 	std::uint32_t OpenId();  // popup id of the open list, 0 when closed
+	bool          OpenNoLock();
+	// The list was opened but SKSE Menu Framework has not drawn it for a while: it is not on screen
+	bool          Stalled();  // the list is open; safe from any thread, even inside the list's drawing
 
 	// From the input frame while the list is open
 	void Wheel(int a_steps);  // + up, - down

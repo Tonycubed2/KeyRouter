@@ -11,6 +11,15 @@ namespace Poll
 	void InstallDirectInput();                                // plugin load
 	void InstallImportHooks(const std::vector<std::string>& a_dllStems);  // data loaded
 
+	// Also hook the keyboard reads of the DLLs in the game folder (ENB, ReShade...): they only get
+	// the quick-list rule below. Data loaded, after InstallImportHooks.
+	void InstallListGuard();
+
+	// The quick conflict list opened: Enter, Up and Down belong to it. Every hooked module sees
+	// them as up until the list is closed and they are let go (ENB's Shift+Enter editor key would
+	// otherwise fire when Shift is the key in conflict and Enter picks).
+	void ListOpened();
+
 	void Set(std::uint32_t a_code, std::vector<std::string> a_blocked, std::string a_forced);
 
 	// The router has looked at the current press of this key (true), or the press ended (false).

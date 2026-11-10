@@ -1,5 +1,6 @@
 #include "Quick.h"
 
+#include "Poll.h"
 #include "Router.h"
 
 #include <Windows.h>
@@ -23,6 +24,10 @@ namespace Quick
 		ImVec2                   g_pos{ 0, 0 };
 		ImVec2                   g_lastMouse{ -1, -1 };
 		std::atomic<std::uint64_t> g_closedAt{ 0 };
+		std::atomic<bool>          g_openFlag{ false };  // g_id != 0, readable without g_lock
+		std::atomic<std::uint64_t> g_openedAt{ 0 };
+		std::atomic<std::uint64_t> g_drawnAt{ 0 };  // last frame the list was drawn (0: not yet since it opened)
+		constexpr std::uint64_t    kAppearMs = 2000;  // a list not drawn by then is given up
 
 		std::uint64_t NowMs()
 		{
@@ -39,6 +44,7 @@ namespace Quick
 			}
 			const auto id = g_id;
 			g_id = 0;
+			g_openFlag = false;
 			g_closedAt = NowMs();
 			const int index = std::clamp(a_index, 0, static_cast<int>(g_names.size()) - 1);
 			return std::make_pair(id, index);
@@ -65,9 +71,18 @@ namespace Quick
 				}
 				return;
 			}
-			const auto mouse = GetMousePos();
+			const auto   mouse = GetMousePos();
+			const auto*  io = GetIO();
+			const ImVec2 screen = io ? io->DisplaySize : ImVec2{ 0, 0 };
 			if (g_placeAtMouse) {
-				g_pos = mouse;
+				// At the pointer. Right after a load the pointer position is not known yet (ImGui keeps
+				// it at -FLT_MAX until the mouse moves): the list then went far off screen and could not
+				// be seen. Use the middle of the screen then.
+				const bool onScreen = IsMousePosValid(&mouse) && mouse.x >= 0 && mouse.y >= 0 &&
+				                      (screen.x <= 0 || (mouse.x < screen.x && mouse.y < screen.y));
+				g_pos = onScreen ? mouse : ImVec2{ std::max(0.0F, screen.x * 0.5F - 160.0F), std::max(0.0F, screen.y * 0.4F) };
+				logger::info("Quick list placed at {:.0f},{:.0f} ({}; screen {:.0f}x{:.0f})", g_pos.x, g_pos.y,
+					onScreen ? "at the mouse pointer" : "mouse position unknown, middle of the screen", screen.x, screen.y);
 				g_lastMouse = mouse;
 				g_placeAtMouse = false;
 			}
@@ -81,6 +96,14 @@ namespace Quick
 						ImGuiWindowFlags_NoNav)) {  // no keyboard navigation: with it, Enter "activated" the first line instead of the highlighted one
 				End();
 				return;
+			}
+			g_drawnAt = NowMs();
+			// keep the whole list on screen (a pointer near the right or bottom edge)
+			if (screen.x > 0 && screen.y > 0) {
+				const auto size = GetWindowSize();
+				const ImVec2 fitted{ std::clamp(g_pos.x, 0.0F, std::max(0.0F, screen.x - size.x)),
+					std::clamp(g_pos.y, 0.0F, std::max(0.0F, screen.y - size.y)) };
+				g_pos = fitted;
 			}
 			TextColored(ImVec4{ 0.86F, 0.74F, 0.50F, 1.0F }, "%s", g_title.c_str());
 			Separator();
@@ -145,11 +168,15 @@ namespace Quick
 		{
 			std::scoped_lock lock(g_lock);
 			g_id = a_popupId;
+			g_openFlag = true;
+			g_openedAt = NowMs();
+			g_drawnAt = 0;
 			g_title = std::move(a_title);
 			g_names = std::move(a_names);
 			g_highlight = 0;
 			g_placeAtMouse = true;
 		}
+		Poll::ListOpened();
 		g_window->IsOpen = true;
 	}
 
@@ -162,6 +189,19 @@ namespace Quick
 	{
 		std::scoped_lock lock(g_lock);
 		return g_id;
+	}
+
+	bool Stalled()
+	{
+		if (!g_openFlag.load()) {
+			return false;
+		}
+		return g_drawnAt.load() == 0 && NowMs() - g_openedAt.load() > kAppearMs;
+	}
+
+	bool OpenNoLock()
+	{
+		return g_openFlag.load(std::memory_order_relaxed);
 	}
 
 	void Wheel(int a_steps)
@@ -201,6 +241,7 @@ namespace Quick
 				g_closedAt = NowMs();
 			}
 			g_id = 0;
+			g_openFlag = false;
 		}
 		if (g_window) {
 			g_window->IsOpen = false;

@@ -1,4 +1,4 @@
-Key Router 1.6.1 (BETA)
+Key Router 1.6.2 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -200,6 +200,20 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.2
+-----
+- Quick conflict window: Enter, Up and Down are now also kept from DLLs in the game folder that
+  read the keyboard themselves (ENB, ReShade...) until they are let go. ENB's editor key is
+  Shift+Enter, so holding Shift (the key in conflict) and pressing Enter to pick opened the ENB
+  editor. KeyRouter.log names the game-folder DLLs this applies to.
+- Quick conflict window: right after a game was loaded, before the mouse had moved, the list
+  could be placed far off screen: the game waited for an answer nobody could see. It now opens
+  in the middle of the screen when the pointer position is not known, always stays fully on
+  screen, and a list that has not been drawn after 2 seconds is given up (Nobody gets that
+  press, and KeyRouter.log says so).
+- Keyboard map: the pop-up for the key under the mouse ends with the key's scan code, in
+  decimal and hex (mouse buttons: the 256+ code). That is the number mod config files use.
 
 1.6.1
 -----

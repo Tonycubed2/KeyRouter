@@ -1786,7 +1786,14 @@ namespace Router
 				const bool shown = quickOpen ? Quick::OpenId() == popup.id : boxOpen;
 				// the quick list closed by Esc: Nobody at once; the message box may blink while it re-opens
 				const std::uint64_t grace = Quick::OpenId() == 0 && Settings::quickConflict ? 0 : 1000;
-				if (shown) {
+				if (shown && Quick::Stalled()) {
+					// open, but never drawn: the player cannot see it, so do not keep the key waiting
+					const auto id = popup.id;
+					logger::warn("{}: the quick list did not appear on screen; nobody gets this press", Keys::Name(popup.code));
+					lock.unlock();
+					OnPopupAnswer(id, 0);
+					lock.lock();
+				} else if (shown) {
 					popup.seenOpen = true;
 					popup.lastSeenOpen = now;
 				} else if ((popup.seenOpen && now - popup.lastSeenOpen > grace) || (!popup.seenOpen && now - popup.createdAt > 15000)) {

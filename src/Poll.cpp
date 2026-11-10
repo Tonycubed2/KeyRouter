@@ -3,6 +3,7 @@
 #include "Diag.h"
 #include "Keys.h"
 #include "Owners.h"
+#include "Quick.h"
 #include "Scanner.h"
 #include "Settings.h"
 
@@ -10,6 +11,7 @@
 #include <Windows.h>
 #include <dinput.h>
 #include <intrin.h>
+#include <TlHelp32.h>
 
 #pragma intrinsic(_ReturnAddress)
 
@@ -145,9 +147,42 @@ namespace Poll
 
 		constexpr std::uint16_t kDownBit = 0x8000;
 
+		// The quick conflict list's own keys: Enter picks, Up/Down move the highlight. From the moment
+		// the list opens until these keys are let go after it closed, every hooked module that reads
+		// the keyboard itself sees them as up. ENB's editor key is Shift+Enter: the player holds Shift
+		// (the key in conflict) and presses Enter to pick, and ENB, which polls GetAsyncKeyState,
+		// opened its editor.
+		std::atomic<bool> g_listOwns{ false };
+
+		bool ListKey(int a_vk)
+		{
+			return a_vk == VK_RETURN || a_vk == VK_UP || a_vk == VK_DOWN;
+		}
+
+		bool ListBlocks(int a_vk)
+		{
+			if (!g_listOwns.load(std::memory_order_relaxed) || !ListKey(a_vk)) {
+				return false;
+			}
+			if (Quick::OpenNoLock()) {
+				return true;
+			}
+			// the list is closed: keep them hidden until all of them are up
+			for (const int vk : { VK_RETURN, VK_UP, VK_DOWN }) {
+				if (static_cast<std::uint16_t>(g_realGetAsyncKeyState(vk)) & kDownBit) {
+					return true;
+				}
+			}
+			g_listOwns = false;
+			return false;
+		}
+
 		SHORT WINAPI Hook_GetAsyncKeyState(int a_vk)
 		{
 			const SHORT result = g_realGetAsyncKeyState(a_vk);
+			if (ListBlocks(a_vk & 0xFF)) {
+				return 0;
+			}
 			if (!Active()) {
 				return result;
 			}
@@ -165,6 +200,9 @@ namespace Poll
 		SHORT WINAPI Hook_GetKeyState(int a_vk)
 		{
 			const SHORT result = g_realGetKeyState(a_vk);
+			if (ListBlocks(a_vk & 0xFF)) {
+				return static_cast<SHORT>(static_cast<std::uint16_t>(result) & 0x0001);  // keep only the toggle bit
+			}
 			if (!Active()) {
 				return result;
 			}
@@ -182,6 +220,13 @@ namespace Poll
 		BOOL WINAPI Hook_GetKeyboardState(PBYTE a_state)
 		{
 			const BOOL ok = g_realGetKeyboardState(a_state);
+			if (ok && a_state && g_listOwns.load(std::memory_order_relaxed)) {
+				for (const int vk : { VK_RETURN, VK_UP, VK_DOWN }) {
+					if (ListBlocks(vk)) {
+						a_state[vk] &= 0x01;
+					}
+				}
+			}
 			if (!ok || !a_state || !Active()) {
 				return ok;
 			}
@@ -457,17 +502,36 @@ namespace Poll
 		logger::info("DirectInput keyboard hooks installed");
 	}
 
+	namespace
+	{
+		bool LoadUser32()
+		{
+			if (!g_realGetAsyncKeyState || !g_realGetKeyState || !g_realGetKeyboardState) {
+				if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
+					g_realGetAsyncKeyState = reinterpret_cast<GetAsyncKeyState_t>(GetProcAddress(user32, "GetAsyncKeyState"));
+					g_realGetKeyState = reinterpret_cast<GetKeyState_t>(GetProcAddress(user32, "GetKeyState"));
+					g_realGetKeyboardState = reinterpret_cast<GetKeyboardState_t>(GetProcAddress(user32, "GetKeyboardState"));
+				}
+			}
+			return g_realGetAsyncKeyState && g_realGetKeyState && g_realGetKeyboardState;
+		}
+
+		std::wstring Lower(std::wstring a_text)
+		{
+			for (auto& c : a_text) {
+				c = static_cast<wchar_t>(towlower(c));
+			}
+			return a_text;
+		}
+	}
+
 	void InstallImportHooks(const std::vector<std::string>& a_dllStems)
 	{
 		if (a_dllStems.empty()) {
 			return;
 		}
 
-		if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
-			g_realGetAsyncKeyState = reinterpret_cast<GetAsyncKeyState_t>(GetProcAddress(user32, "GetAsyncKeyState"));
-			g_realGetKeyState = reinterpret_cast<GetKeyState_t>(GetProcAddress(user32, "GetKeyState"));
-			g_realGetKeyboardState = reinterpret_cast<GetKeyboardState_t>(GetProcAddress(user32, "GetKeyboardState"));
-		}
+		LoadUser32();
 		const bool canHook = Settings::pollHooks && g_realGetAsyncKeyState && g_realGetKeyState && g_realGetKeyboardState;
 		if (Settings::pollHooks && !canHook) {
 			logger::error("Could not find the user32 keyboard functions; key-polling hooks not installed");
@@ -502,6 +566,57 @@ namespace Poll
 			count += PatchImport(handle, "GetKeyboardState", reinterpret_cast<void*>(&Hook_GetKeyboardState));
 			logger::info("Watching {}: {} direct keyboard read(s) hooked", module.fileName, count);
 		}
+	}
+
+	void InstallListGuard()
+	{
+		if (!Settings::pollHooks || !LoadUser32()) {
+			return;
+		}
+		wchar_t exe[MAX_PATH]{};
+		if (!GetModuleFileNameW(nullptr, exe, MAX_PATH)) {
+			return;
+		}
+		const auto gameDir = Lower(std::filesystem::path(exe).parent_path().wstring());
+		const auto exeModule = GetModuleHandleW(nullptr);
+
+		HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+		if (snap == INVALID_HANDLE_VALUE) {
+			return;
+		}
+		MODULEENTRY32W entry{};
+		entry.dwSize = sizeof(entry);
+		for (BOOL more = Module32FirstW(snap, &entry); more; more = Module32NextW(snap, &entry)) {
+			const auto module = entry.hModule;
+			if (module == exeModule) {
+				continue;
+			}
+			// DLLs in the game folder itself: ENB (d3d11.dll), ReShade (dxgi.dll) and the like
+			const std::filesystem::path path(entry.szExePath);
+			if (Lower(path.parent_path().wstring()) != gameDir) {
+				continue;
+			}
+			{
+				std::scoped_lock lock(g_lock);
+				if (g_watched.contains(module)) {
+					continue;  // already hooked as a watched SKSE plugin
+				}
+			}
+			int count = 0;
+			count += PatchImport(module, "GetAsyncKeyState", reinterpret_cast<void*>(&Hook_GetAsyncKeyState));
+			count += PatchImport(module, "GetKeyState", reinterpret_cast<void*>(&Hook_GetKeyState));
+			count += PatchImport(module, "GetKeyboardState", reinterpret_cast<void*>(&Hook_GetKeyboardState));
+			if (count > 0) {
+				logger::info("Quick list keys (Enter, Up, Down) kept from {} while the list is open: {} keyboard read(s) hooked",
+					path.filename().string(), count);
+			}
+		}
+		CloseHandle(snap);
+	}
+
+	void ListOpened()
+	{
+		g_listOwns = true;
 	}
 
 	void Set(std::uint32_t a_code, std::vector<std::string> a_blocked, std::string a_forced)
