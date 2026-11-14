@@ -1,4 +1,4 @@
-Key Router 1.6.3 (BETA)
+Key Router 1.6.4 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -123,6 +123,16 @@ is on.
 With key routing off, the settings page and the keyboard map still work, but the map cannot
 show script (Papyrus) hotkeys, because finding them needs the routing hooks.
 
+PICKING THE WINNER FROM THE MAP (1.6.4)
+---------------------------------------
+Double-click a key on the keyboard map: a small menu lists the mods that want that key during
+play (the same list the conflict window would show), plus Nobody. Pick one and that key goes
+straight to it in game, with no window; Nobody means no mod gets it. It is saved exactly like
+"Remember my choice", so it also shows on the Remembered choices page, and it is used while
+exactly these mods want the key: if one is added or removed, Key Router asks again. When a
+choice is already saved, the menu marks it and offers "Forget: ask me each time". A key that
+only one mod uses has nothing to pick.
+
 FIXING CONFLICTS FROM THE MAP (1.3.0)
 -------------------------------------
 Click a key on the keyboard map: the panel at the bottom lists every mod that uses it and how
@@ -200,6 +210,11 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.4
+-----
+- Keyboard map: double-click a key to pick which mod gets it during play, or Nobody (or forget
+  a saved pick). Saved like "Remember my choice" in the conflict window.
 
 1.6.3
 -----

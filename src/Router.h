@@ -47,7 +47,13 @@ namespace Router
 	{
 		std::vector<KeyBind> plain;   // want the key on its own: these decide the color
 		std::vector<KeyBind> combos;  // want it only together with Shift/Ctrl/Alt
-		std::string          remembered;  // remembered choice for this key, if any
+		std::string          remembered;  // remembered choice for this key, if any (a mod's name, or "nobody")
+
+		// (1.6.4) The mods that compete for a plain press of this key during play, exactly as a conflict
+		// window would list them (passive mods left out): id for KeyRouter_Choices.ini, and name.
+		// Two or more means a conflict, and the map lets the player pick the winner here.
+		std::vector<std::pair<std::string, std::string>> competitors;
+		std::string                                      rememberedId;  // id of the remembered pick, "nobody", or ""
 	};
 
 	// Every key code Key Router knows (0-255 keyboard, 256-265 mouse), as seen during normal

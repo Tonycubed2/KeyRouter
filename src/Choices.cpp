@@ -179,6 +179,18 @@ namespace Choices
 		return out;
 	}
 
+	void ForgetSet(std::uint32_t a_code, const std::vector<std::string>& a_set)
+	{
+		std::scoped_lock lock(g_lock);
+		const auto       set = Canonical(a_set);
+		const auto       before = g_entries.size();
+		std::erase_if(g_entries, [&](const Entry& e) { return e.code == a_code && e.set == set; });
+		if (g_entries.size() != before) {
+			logger::info("Forgot the remembered choice for {}", Keys::Name(a_code));
+			Write();
+		}
+	}
+
 	void Forget(std::uint32_t a_code, const std::string& a_set)
 	{
 		std::scoped_lock lock(g_lock);

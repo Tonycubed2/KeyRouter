@@ -2265,9 +2265,13 @@ namespace Router
 				}
 				entry.plain.push_back(std::move(kb));
 			}
+			for (const auto& c : active) {
+				entry.competitors.emplace_back(CandidateKey(c), c.display);
+			}
 			if (active.size() >= 2) {
 				if (const auto choice = Choices::Find(code, CandidateKeys(active))) {
 					entry.remembered = choice->picked;
+					entry.rememberedId = choice->picked;
 					for (const auto& c : active) {
 						if (CandidateKey(c) == choice->picked) {
 							entry.remembered = c.display;

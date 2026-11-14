@@ -1,5 +1,6 @@
 #include "Viewer.h"
 
+#include "Choices.h"
 #include "Fix.h"
 #include "Keys.h"
 #include "Router.h"
@@ -144,6 +145,7 @@ namespace Viewer
 		ImVec2                                              g_pan{ 0, 0 };
 		std::uint32_t                                       g_selected = 0;  // 0 = none
 		ImVec2                                              g_pressPos{ 0, 0 };
+		std::uint32_t                                       g_pickCode = 0;  // (1.6.4) key whose "who gets it" menu is open
 
 		enum class Color
 		{
@@ -461,6 +463,75 @@ namespace Viewer
 			return out;
 		}
 
+		// g_mapLock held. (1.6.4) The "who gets this key" menu opened by a double-click on a key.
+		void PickWinnerPopup()
+		{
+			if (!BeginPopup("##whogetsit")) {
+				return;
+			}
+			const ImVec4 gold{ 0.86F, 0.74F, 0.50F, 1.0F };
+			const auto   it = g_map.find(g_pickCode);
+			if (g_pickCode == 0 || it == g_map.end()) {
+				CloseCurrentPopup();
+				EndPopup();
+				return;
+			}
+			auto&      entry = it->second;
+			const auto name = DisplayName(g_pickCode);
+			TextColored(gold, "%s: who gets this key during play?", name.c_str());
+			Separator();
+			if (entry.competitors.size() < 2) {
+				Text("%s", entry.competitors.empty() ? "No mod uses this key: nothing to choose." :
+				                                       "Only one mod uses this key: nothing to choose.");
+				if (Button("Close##whogetsit")) {
+					CloseCurrentPopup();
+				}
+				EndPopup();
+				return;
+			}
+
+			std::vector<std::string> set;
+			std::string              names;
+			for (const auto& [id, display] : entry.competitors) {
+				set.push_back(id);
+				names += (names.empty() ? "" : ", ") + display;
+			}
+			auto remember = [&](const std::string& a_id, const std::string& a_shown) {
+				Choices::Remember(g_pickCode, set, a_id, std::format("{}: {} -> {}", Keys::Name(g_pickCode), names, a_shown));
+				entry.rememberedId = a_id;
+				entry.remembered = a_id == "nobody" ? std::string("nobody") : a_shown;
+				logger::info("[map] {}: remembered choice set to {} (from the keyboard map)", Keys::Name(g_pickCode), a_shown);
+				CloseCurrentPopup();
+			};
+
+			for (std::size_t i = 0; i < entry.competitors.size(); ++i) {
+				const auto& [id, display] = entry.competitors[i];
+				const bool  current = entry.rememberedId == id;
+				const auto  label = std::format("{}{}##pick{}", display, current ? "   (current choice)" : "", i);
+				if (Selectable(label.c_str(), current)) {
+					remember(id, display);
+				}
+			}
+			const bool nobody = entry.rememberedId == "nobody";
+			if (Selectable(nobody ? "Nobody   (current choice)##picknobody" : "Nobody##picknobody", nobody)) {
+				remember("nobody", "Nobody");
+			}
+			if (!entry.rememberedId.empty()) {
+				Separator();
+				if (Selectable("Forget: ask me each time##pickforget")) {
+					Choices::ForgetSet(g_pickCode, set);
+					entry.rememberedId.clear();
+					entry.remembered.clear();
+					logger::info("[map] {}: remembered choice forgotten (from the keyboard map)", Keys::Name(g_pickCode));
+					CloseCurrentPopup();
+				}
+			}
+			Separator();
+			TextDisabled("Saved like \"Remember my choice\". Used while exactly these mods want this key;");
+			TextDisabled("if a mod that wants it is added or removed, Key Router asks again.");
+			EndPopup();
+		}
+
 		// g_mapLock held. The panel under the keyboard: the selected key, its mods, how to change them.
 		void DetailPanel(ImVec2 a_size)
 		{
@@ -613,7 +684,7 @@ namespace Viewer
 			const float cx = wpos.x + wsize.x * 0.5F;
 			const float titleY = wpos.y + 22;
 			const std::string title = "K E Y B O A R D   M A P";
-			const std::string sub = "104 KEYS + MOUSE   \xC2\xB7   WHEEL ZOOMS   \xC2\xB7   DRAG MOVES   \xC2\xB7   CLICK A KEY";
+			const std::string sub = "104 KEYS + MOUSE   \xC2\xB7   WHEEL ZOOMS   \xC2\xB7   DRAG MOVES   \xC2\xB7   CLICK A KEY   \xC2\xB7   DOUBLE-CLICK: WHO GETS IT";
 			DrawCentered(dl, titleSize, cx, titleY, IM_COL32(225, 205, 160, 255), title);
 			const float tw = TextWidth(title, titleSize);
 			GoldRule(dl, cx - tw * 0.5F - wsize.x * 0.16F, cx - tw * 0.5F - 18, titleY + titleSize * 0.55F);
@@ -693,6 +764,14 @@ namespace Viewer
 			if (click) {
 				g_selected = hoverKey ? hoverKey->code : 0;
 			}
+			// (1.6.4) double-click a key: pick which mod gets it during play, or nobody. Saved like
+			// "Remember my choice" in the conflict window.
+			if (hovered && hoverKey && IsMouseDoubleClicked(0)) {
+				g_pickCode = hoverKey->code;
+				g_selected = hoverKey->code;
+				OpenPopup("##whogetsit");
+			}
+			PickWinnerPopup();
 			if (hoverKey) {
 				const auto  it = g_map.find(hoverKey->code);
 				const auto& entry = it == g_map.end() ? empty : it->second;

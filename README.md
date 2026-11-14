@@ -41,6 +41,7 @@ Mods often grab the same key without knowing about each other. You press L and t
   - blue corner: a remembered choice exists for that key
 - The mouse wheel zooms and dragging moves the map. Zoom in to see mod names on the keys.
 - **Click a key** to see every mod using it, where its key is set, and how to change it.
+- **Double-click a key** to pick which mod gets it during play, or Nobody. It is saved like "Remember my choice" (and can be forgotten from the same menu).
 
 ### Fix conflicts from the map
 - **DLL mods with a config file**: click **Move...**, then press the new key.
@@ -110,7 +111,7 @@ The DLL and PDB are in `build\Release`. Install them with `KeyRouter.ini` into `
 ## License
 - Key Router's own source code: **MIT**, see [LICENSE](LICENSE).
 - `KeyRouter.dll` statically links [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG), which is **GPL-3.0-or-later** with the Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source). So the compiled DLL as a whole is distributed under **GPL-3.0-or-later** with those exceptions. See [GPL-3.0.txt](GPL-3.0.txt) and [CommonLibSSE-NG-EXCEPTIONS.txt](CommonLibSSE-NG-EXCEPTIONS.txt).
-- Corresponding source for each release: this repository at the release tag (for example `v1.6.2`), plus CommonLibSSE NG 6.7.0.
+- Corresponding source for each release: this repository at the release tag (for example `v1.6.4`), plus CommonLibSSE NG 6.7.0.
 - Other libraries in the build (spdlog, {fmt}, DirectXTK, Xbyak, and the SKSE Menu Framework API header) are listed with their licenses in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits

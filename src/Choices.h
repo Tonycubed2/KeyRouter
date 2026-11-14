@@ -37,4 +37,7 @@ namespace Choices
 
 	// Removes one entry (or all with a_code == 0 and an empty a_set) and writes the file.
 	void Forget(std::uint32_t a_code, const std::string& a_set);
+
+	// (1.6.4) Removes the entry for this key and set of competing mods (any order), if there is one.
+	void ForgetSet(std::uint32_t a_code, const std::vector<std::string>& a_set);
 }

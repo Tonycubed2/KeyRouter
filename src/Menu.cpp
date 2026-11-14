@@ -435,7 +435,8 @@ namespace Menu
 		void __stdcall RenderMap()
 		{
 			Help("A map of the keyboard and mouse: green = no mod, orange = one mod, yellow = shared but no conflict,\n"
-				 "red = conflict, blue corner = remembered choice. Mouse wheel zooms, drag moves, click a key for details.");
+				 "red = conflict, blue corner = remembered choice. Mouse wheel zooms, drag moves, click a key for details,\n"
+				 "double-click a key to pick which mod gets it during play (or nobody).");
 			Spacing();
 			if (Button("Open keyboard map")) {
 				if (!Viewer::Open()) {
