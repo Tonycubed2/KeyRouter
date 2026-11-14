@@ -69,6 +69,10 @@ namespace Router
 	};
 	WindowVerdict WindowKey(std::uint32_t a_code);
 
+	// (1.6.3) For window messages held since a_heldSince (ms, steady clock) whose press has already ended:
+	// kPass or kDrop as that press was decided, kUndecided if no ended press covers them.
+	WindowVerdict WindowAfterPress(std::uint32_t a_code, std::uint64_t a_heldSince);
+
 	// The DLL whose window procedure the gate sits in front of (lowercase name, no .dll)
 	void SetWindowReader(const std::string& a_stem);
 }

@@ -1,4 +1,4 @@
-Key Router 1.6.2 (BETA)
+Key Router 1.6.3 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -200,6 +200,15 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.3
+-----
+- Fix: a press given to "Nobody" (or to a script or the game) could still reach a DLL mod that
+  reads its hotkey from the game window's key messages. When the key was already released by
+  the time you picked, the window gate let the held messages through 150 ms later. Choosing
+  "Nobody" for Num + this way turned on SkyrimUpscaler's FrameWarp (its Num + hotkey), which
+  then froze the game inside its frame generation. Held messages now go exactly where the
+  press went: through for the DLL mod you picked, dropped for anyone else.
 
 1.6.2
 -----

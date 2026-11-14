@@ -492,8 +492,44 @@ namespace Router
 		}
 
 		// g_lock held
+		// (1.6.3) defined further down, next to g_windowReader
+		bool OwnersReadWindow(const std::vector<std::string>& a_owners);
+
+		// (1.6.3) What happens to window key messages the gate still holds for a press that has ended.
+		// Before 1.6.3 the gate let them through 150 ms after the press ended, so a DLL mod that reads its
+		// hotkey from window messages (SkyrimUpscaler) still got a press the player gave to nobody or to
+		// another mod: choosing "nobody" for Num + turned on Upscaler's FrameWarp.
+		struct WindowAfter
+		{
+			std::uint64_t at{ 0 };  // when the press ended; 0 = no record
+			bool          pass{ false };
+		};
+		std::array<WindowAfter, Keys::kMaxCode> g_windowAfter{};  // g_lock
+
+		// g_lock held. Called when a press ends: messages held for it go where the press went.
+		void RecordWindowOutcome(std::uint32_t a_code)
+		{
+			const auto& state = g_keys[a_code];
+			bool        pass = true;  // a free press (no conflict): everyone, the window reader too
+			switch (state.mode) {
+			case Mode::kRouted:
+				pass = OwnersReadWindow(state.owners);
+				break;
+			case Mode::kPending:
+			case Mode::kAnswered:
+				pass = false;  // ended undecided (window closed, reset): nobody
+				break;
+			case Mode::kIdle:
+				return;  // nothing was decided; keep the earlier record
+			default:
+				break;
+			}
+			g_windowAfter[a_code] = { NowMs(), pass };
+		}
+
 		void ResetKey(std::uint32_t a_code)
 		{
+			RecordWindowOutcome(a_code);
 			g_keys[a_code] = KeyState{};
 			g_physical[a_code] = false;
 			Poll::Clear(a_code);
@@ -1910,9 +1946,13 @@ namespace Router
 				state.synthetic = false;
 				SyncPoll(popup.code);
 			} else {
+				state.mode = Mode::kRouted;  // (1.6.3) so ResetKey records "nobody" for held window messages
+				state.owners.clear();
+				state.synthetic = false;
 				ResetKey(popup.code);
 			}
 			UpdateWork();
+			Gate::Kick();
 			return;
 		}
 
@@ -2377,6 +2417,27 @@ namespace Router
 	namespace
 	{
 		std::string g_windowReader;  // g_lock
+
+		// g_lock held. Does the mod that reads the game window's key messages own this press?
+		bool OwnersReadWindow(const std::vector<std::string>& a_owners)
+		{
+			return std::any_of(a_owners.begin(), a_owners.end(), [](const std::string& id) {
+				return g_windowReader.empty() ? id.starts_with("dll:") : id == "dll:" + g_windowReader;
+			});
+		}
+	}
+
+	WindowVerdict WindowAfterPress(std::uint32_t a_code, std::uint64_t a_heldSince)
+	{
+		std::scoped_lock lock(g_lock);
+		if (a_code == 0 || a_code >= Keys::kMaxCode) {
+			return WindowVerdict::kUndecided;
+		}
+		const auto& after = g_windowAfter[a_code];
+		if (after.at == 0 || a_heldSince > after.at) {
+			return WindowVerdict::kUndecided;  // these messages belong to a newer press
+		}
+		return after.pass ? WindowVerdict::kPass : WindowVerdict::kDrop;
 	}
 
 	void SetWindowReader(const std::string& a_stem)
@@ -2408,11 +2469,7 @@ namespace Router
 		case Mode::kRouted:
 			// Through only when the picked mod is the one that reads these messages (or, when
 			// that is not known, any DLL mod)
-			return std::any_of(state.owners.begin(), state.owners.end(), [](const std::string& id) {
-				return g_windowReader.empty() ? id.starts_with("dll:") : id == "dll:" + g_windowReader;
-			}) ?
-			           WindowVerdict::kPass :
-			           WindowVerdict::kDrop;
+			return OwnersReadWindow(state.owners) ? WindowVerdict::kPass : WindowVerdict::kDrop;
 		default:
 			return WindowVerdict::kPass;
 		}

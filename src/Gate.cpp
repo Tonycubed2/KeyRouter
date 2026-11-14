@@ -102,8 +102,19 @@ namespace Gate
 					Flush(a_hwnd, key, false);
 					break;
 				case Router::WindowVerdict::kUndecided:
-					if (now - key.since > kUndecidedMs) {
-						Flush(a_hwnd, key, true);  // the router never saw this press: let it through
+					// (1.6.3) the press may already have ended: then the messages go where it went
+					switch (Router::WindowAfterPress(code, key.since)) {
+					case Router::WindowVerdict::kPass:
+						Flush(a_hwnd, key, true);
+						break;
+					case Router::WindowVerdict::kDrop:
+						Flush(a_hwnd, key, false);
+						break;
+					default:
+						if (now - key.since > kUndecidedMs) {
+							Flush(a_hwnd, key, true);  // the router never saw this press: let it through
+						}
+						break;
 					}
 					break;
 				case Router::WindowVerdict::kHold:
