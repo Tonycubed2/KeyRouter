@@ -78,7 +78,8 @@ namespace Choices
 			}
 			out << "; Key Router remembered choices.\n"
 				   "; Each entry: key code = picked mod | all mods that wanted the key.\n"
-				   "; It is used only when exactly those mods want that key again; otherwise the window asks.\n"
+				   "; If the mods on a key change later, the choice is still used while its winner is one of them\n"
+				   "; (\"nobody\" only while no new mod joined); otherwise the window asks.\n"
 				   "; Delete an entry (both lines) to be asked again. \"nobody\" means the key goes to none of them.\n\n"
 				   "[Choices]\n";
 			for (const auto& e : g_entries) {
@@ -157,7 +158,57 @@ namespace Choices
 				return Choice{ e.picked };
 			}
 		}
-		return std::nullopt;
+
+		// (1.6.5) No entry for exactly these mods: the mods on this key changed since the choice was
+		// saved (one was added or removed). Reuse a saved choice for this key when its winner is still
+		// one of the mods that want the key now. "Nobody" is reused only when no new mod joined (the
+		// mods now are some of the ones you said no to). If several saved choices fit, the one whose
+		// mods overlap most with the mods now wins; on a tie, the newest.
+		const auto now = SplitCommas(set);
+		std::vector<std::string> nowList;
+		for (const auto& s : now) {
+			nowList.push_back(Trim(s));
+		}
+		const Entry* best = nullptr;
+		std::size_t  bestOverlap = 0;
+		for (const auto& e : g_entries) {
+			if (e.code != a_code) {
+				continue;
+			}
+			std::vector<std::string> saved;
+			for (const auto& s : SplitCommas(e.set)) {
+				saved.push_back(Trim(s));
+			}
+			std::size_t overlap = 0;
+			bool        allNowInSaved = true;
+			for (const auto& s : nowList) {
+				if (std::find(saved.begin(), saved.end(), s) != saved.end()) {
+					++overlap;
+				} else {
+					allNowInSaved = false;
+				}
+			}
+			bool fits = false;
+			if (e.picked == "nobody") {
+				fits = allNowInSaved;
+			} else {
+				fits = std::find(nowList.begin(), nowList.end(), e.picked) != nowList.end();
+			}
+			if (fits && overlap >= bestOverlap) {
+				best = &e;
+				bestOverlap = overlap;
+			}
+		}
+		if (!best) {
+			return std::nullopt;
+		}
+		static std::set<std::string> s_logged;
+		const auto                   tag = std::format("{:02X}|{}", a_code, set);
+		if (s_logged.insert(tag).second) {
+			logger::info("{}: the mods on this key changed (now {}; saved choice was for {}): still sending it to {}",
+				Keys::Name(a_code), set, best->set, best->picked);
+		}
+		return Choice{ best->picked };
 	}
 
 	void Remember(std::uint32_t a_code, const std::vector<std::string>& a_set, const std::string& a_picked, const std::string& a_comment)

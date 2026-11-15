@@ -1,4 +1,4 @@
-Key Router 1.6.4 (BETA)
+Key Router 1.6.5 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -21,7 +21,9 @@ What it does
 
   Remember my choice: the window has a "Remember my choice: OFF" button. Click it to switch it ON
   (the window reopens), then pick a mod or Nobody. From then on that key goes straight to your pick
-  whenever exactly those mods want it, without asking; if the mods on that key change, it asks again.
+  whenever those mods want it, without asking. If the mods on that key change later (a mod added
+  or removed), your pick still holds as long as the mod you picked still wants the key; Nobody
+  still holds as long as no new mod joined. Otherwise it asks again.
   Choices are saved in Data\SKSE\Plugins\KeyRouter_Choices.ini (under MO2 the file lands in the
   overwrite folder). Delete a line there to be asked again.
 
@@ -128,8 +130,8 @@ PICKING THE WINNER FROM THE MAP (1.6.4)
 Double-click a key on the keyboard map: a small menu lists the mods that want that key during
 play (the same list the conflict window would show), plus Nobody. Pick one and that key goes
 straight to it in game, with no window; Nobody means no mod gets it. It is saved exactly like
-"Remember my choice", so it also shows on the Remembered choices page, and it is used while
-exactly these mods want the key: if one is added or removed, Key Router asks again. When a
+"Remember my choice", so it also shows on the Remembered choices page, and it keeps working when
+mods on that key are added or removed, as long as the mod you picked still wants it. When a
 choice is already saved, the menu marks it and offers "Forget: ask me each time". A key that
 only one mod uses has nothing to pick.
 
@@ -210,6 +212,14 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.5
+-----
+- Remembered choices survive changes to the mods on a key. A saved choice used to apply only
+  while exactly the same mods wanted the key, so when a mod stopped or started using it (for
+  example after changing a mod's hotkeys) the window asked again as if nothing was saved. Now the
+  saved pick is still used as long as the mod you picked still wants the key; a saved "Nobody"
+  is still used as long as no new mod joined. KeyRouter.log says once per key when this happens.
 
 1.6.4
 -----

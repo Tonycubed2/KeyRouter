@@ -8,8 +8,10 @@
 //   0x26 = dll:dragonseyeminimap | dll:dragonseyeminimap, dll:unsearchedcorpsesindicator
 //
 // Left of "=": the key code. Right: the picked mod's id, or "nobody", then "|", then the ids of all
-// mods that competed for the key. A choice applies only when exactly that set of mods competes
-// again; if a mod is added or removed, the window asks again. Delete a line to be asked again.
+// mods that competed for the key. A choice applies when exactly that set of mods competes again.
+// (1.6.5) If the mods on the key changed since, it still applies while the picked mod is one of the
+// mods that want the key now ("nobody": while no new mod joined); otherwise the window asks again.
+// Delete a line to be asked again.
 namespace Choices
 {
 	struct Choice
