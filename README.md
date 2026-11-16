@@ -28,6 +28,7 @@ Mods often grab the same key without knowing about each other. You press L and t
 ### The choice window
 - Lists every mod that wants the key, plus **Nobody**.
 - The mod you pick gets the key press. Hold the key while you click to give it a hold instead of a tap.
+- **Quick mode** (a list at the mouse pointer): click, Enter or a wheel click picks once; a **right-click asks to make it the default** for that key (Yes / No); Yes remembers it, like Remember my choice.
 - **Remember my choice**: that key then goes straight to your pick, even after reloading. It asks again if a mod that wants the key is added or removed.
 
 ### Keyboard map (needs SKSE Menu Framework)
@@ -111,7 +112,7 @@ The DLL and PDB are in `build\Release`. Install them with `KeyRouter.ini` into `
 ## License
 - Key Router's own source code: **MIT**, see [LICENSE](LICENSE).
 - `KeyRouter.dll` statically links [CommonLibSSE NG](https://github.com/alandtse/CommonLibSSE-NG), which is **GPL-3.0-or-later** with the Modding Exception and the GPL-3.0 Linking Exception (with Corresponding Source). So the compiled DLL as a whole is distributed under **GPL-3.0-or-later** with those exceptions. See [GPL-3.0.txt](GPL-3.0.txt) and [CommonLibSSE-NG-EXCEPTIONS.txt](CommonLibSSE-NG-EXCEPTIONS.txt).
-- Corresponding source for each release: this repository at the release tag (for example `v1.6.4`), plus CommonLibSSE NG 6.7.0.
+- Corresponding source for each release: this repository at the release tag (for example `v1.6.6`), plus CommonLibSSE NG 6.7.0.
 - Other libraries in the build (spdlog, {fmt}, DirectXTK, Xbyak, and the SKSE Menu Framework API header) are listed with their licenses in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
 ## Credits

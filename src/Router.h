@@ -15,7 +15,8 @@ namespace Router
 	void OnPopupAnswer(std::uint32_t a_popupId, std::uint8_t a_button);
 
 	// Quick mode: a_index = which mod (0-based, in the window's order); the mod count means Nobody
-	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index);
+	// a_remember (1.6.6): remember this pick, as with "Remember my choice" (a right-click in the quick list)
+	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index, bool a_remember = false);
 
 	// Mods whose keys live in the save, asked at run time (Spell Hotbar's Shift/Ctrl/Alt bars).
 	// Main thread; called after a game is loaded or started.

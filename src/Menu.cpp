@@ -223,12 +223,12 @@ namespace Menu
 			{
 				int mode = Settings::quickConflict ? 1 : 0;
 				bool changed = RadioButton("Regular (window with buttons, Remember my choice)", &mode, 0);
-				changed |= RadioButton("Quick (list at the mouse pointer: wheel to move, click or Enter to pick, Esc = nobody)", &mode, 1);
+				changed |= RadioButton("Quick (list at the mouse pointer: wheel to move, click or Enter to pick, right-click to make it the default (asks first), Esc = nobody)", &mode, 1);
 				if (changed && (mode == 1) != Settings::quickConflict) {
 					Settings::quickConflict = mode == 1;
 					save = true;
 				}
-				Help("Quick needs SKSE Menu Framework and has no Remember my choice. Remembered choices still apply in both modes.");
+				Help("Quick needs SKSE Menu Framework. In it, a right-click on a mod asks to make it the default for that key; Yes remembers it (like Remember my choice).\nRemembered choices apply in both modes.");
 			}
 
 			SeparatorText("Finding hotkeys");

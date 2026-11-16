@@ -1,4 +1,4 @@
-Key Router 1.6.5 (BETA)
+Key Router 1.6.6 (BETA)
 =======================
 
 BETA - BEST EFFORT, NO GUARANTEES. Make a save before installing. The Move feature edits other
@@ -212,6 +212,16 @@ Each time the map opens, KeyRouter.log gets one [map] line per used key.
   was a script, the game or nobody). Skyrim reads the keyboard through DirectInput, so the game
   itself does not need these messages during play. KeyRouter.log names the mod the gate sits in
   front of. Part of PollHooks.
+
+1.6.6
+-----
+- Quick conflict window: a right-click on a line asks "Are you sure you want to make <mod> the
+  default for <key>?" with Yes and No. Yes picks it and remembers it for that key from now on,
+  the same as "Remember my choice" in the regular window (it shows on the Remembered choices page
+  and can be forgotten there or from the keyboard map). No goes back to the list. While the
+  question is up, only a click on Yes or No answers it (Enter, the wheel and a wheel click do
+  nothing), so a default is never set by accident. A left click, Enter or a wheel click on the
+  list still picks just this once. The right-click goes to the list only, not to the game.
 
 1.6.5
 -----

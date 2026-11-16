@@ -3,15 +3,19 @@
 // Quick mode for the conflict window ([General] ConflictWindow=Quick): instead of the game's
 // message box, a small list of the competing mods at the mouse pointer. The mouse wheel moves the
 // highlight (the wheel belongs to Key Router while the list is open), a left click or Enter picks,
-// Esc means Nobody. The game is paused while it is open. No "Remember my choice" here.
+// Esc means Nobody. The game is paused while it is open. A right-click asks "make it the default
+// for this key?" (Yes / No); Yes picks it and remembers it, like "Remember my choice" in the
+// regular window (1.6.6).
 // Drawn with SKSE Menu Framework; without it the regular window is used.
 namespace Quick
 {
 	void Start();  // kPostLoad
 	bool Available();
 
-	// a_names: the mods, then "Nobody" last. The answer goes to Router::AnswerPopupIndex.
-	void Open(std::uint32_t a_popupId, std::string a_title, std::vector<std::string> a_names);
+	// a_names: the mods, then "Nobody" last. The answer goes to Router::AnswerPopupIndex
+	// (remembered when it was a right-click).
+	// a_keyName: the key's name for the "make it the default" question
+	void Open(std::uint32_t a_popupId, std::string a_title, std::vector<std::string> a_names, std::string a_keyName);
 	bool IsOpen();
 	std::uint32_t OpenId();  // popup id of the open list, 0 when closed
 	bool          OpenNoLock();

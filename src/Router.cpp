@@ -1065,9 +1065,10 @@ namespace Router
 				names.emplace_back("Nobody");
 				const auto id = a_popup.id;
 				auto       title = std::format("{}: which mod gets it?", Keys::Name(a_popup.code));
+				auto       keyName = Keys::Name(a_popup.code);
 				if (auto* task = SKSE::GetTaskInterface()) {
-					task->AddTask([id, title = std::move(title), names = std::move(names)]() mutable {
-						Quick::Open(id, std::move(title), std::move(names));
+					task->AddTask([id, title = std::move(title), names = std::move(names), keyName = std::move(keyName)]() mutable {
+						Quick::Open(id, std::move(title), std::move(names), std::move(keyName));
 					});
 					return;
 				}
@@ -1972,8 +1973,15 @@ namespace Router
 		Gate::Kick();
 	}
 
-	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index)
+	void AnswerPopupIndex(std::uint32_t a_popupId, int a_index, bool a_remember)
 	{
+		if (a_remember) {
+			std::scoped_lock lock(g_lock);
+			if (g_popup && g_popup->id == a_popupId) {
+				g_popup->remember = true;
+				logger::info("{}: picked with a right-click in the quick list, the choice is remembered", Keys::Name(g_popup->code));
+			}
+		}
 		OnPopupAnswer(a_popupId, static_cast<std::uint8_t>(kButtonOffset + std::clamp(a_index, 0, 200)));
 	}
 
